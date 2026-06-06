@@ -982,13 +982,13 @@ ${FORMAT_RULES}`;
   // Render Logic
   const renderSidebar = () => {
     return (
-      <div className="w-full lg:w-80 bg-gradient-to-b from-white to-sky-50 border-r border-sky-100 p-6 flex-shrink-0 flex flex-col h-full overflow-y-auto shadow-[4px_0_24px_rgba(56,189,248,0.08)]">
+      <div className="w-full lg:w-80 bg-gradient-to-b from-white to-teal-50 border-r border-teal-100 p-6 flex-shrink-0 flex flex-col h-full overflow-y-auto shadow-[4px_0_24px_rgba(20,184,166,0.08)]">
         <div className="mb-8">
-          <h1 className="text-2xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-teal-600 to-emerald-500 flex items-center gap-2" style={{ fontFamily: 'Nunito, sans-serif' }}>
-            <Wand2 className="h-6 w-6 text-blue-500" />
-            KHKT Writer Pro
+          <h1 className="text-xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-teal-600 to-emerald-500 flex items-center gap-2" style={{ fontFamily: 'Nunito, sans-serif' }}>
+            <Wand2 className="h-6 w-6 text-teal-500" />
+            TRỢ LÝ VIẾT KHKT 2026
           </h1>
-          <p className="text-xs text-blue-800 font-medium mt-1.5 tracking-wide">✨ Trợ lý viết đề tài KHKT thông minh</p>
+          <p className="text-xs text-teal-700 font-medium mt-1.5 tracking-wide">🔬 Trợ lý viết đề tài Khoa học Kỹ thuật thông minh</p>
         </div>
 
         {/* Progress Stepper */}
@@ -1255,14 +1255,14 @@ ${FORMAT_RULES}`;
       <div className="flex-1 p-4 lg:p-8 flex flex-col h-screen overflow-hidden relative">
 
         {/* Mobile Header */}
-        <div className="lg:hidden mb-4 bg-gradient-to-r from-white to-sky-50 p-4 rounded-xl shadow-lg border border-sky-100 flex flex-col gap-2">
+        <div className="lg:hidden mb-4 bg-gradient-to-r from-white to-teal-50 p-4 rounded-xl shadow-lg border border-teal-100 flex flex-col gap-2">
           <div className="flex justify-between items-center">
-            <h1 className="font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-teal-600 to-emerald-500 text-xl" style={{ fontFamily: 'Nunito, sans-serif' }}>đề tài KHKT 2025</h1>
+            <h1 className="font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-teal-600 to-emerald-500 text-lg" style={{ fontFamily: 'Nunito, sans-serif' }}>TRỢ LÝ VIẾT KHKT 2026</h1>
             <span className="text-xs bg-teal-100 text-teal-700 px-3 py-1 rounded-full font-medium">
               {STEPS_INFO[Math.min(state.step, GenerationStep.COMPLETED)]?.label || ''}
             </span>
           </div>
-          <p className="text-xs text-blue-700 font-medium">✨ Trợ lý viết đề tài KHKT thông minh</p>
+          <p className="text-xs text-teal-700 font-medium">🔬 Trợ lý viết đề tài Khoa học Kỹ thuật thông minh</p>
         </div>
 
         {state.error && (() => {
