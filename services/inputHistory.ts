@@ -3,7 +3,7 @@
  * Cho phép người dùng xem và chọn lại các giá trị đã nhập trước đó
  */
 
-const STORAGE_KEY = 'skkn_input_history';
+const STORAGE_KEY = 'khkt_input_history';
 const MAX_HISTORY_PER_FIELD = 10; // Giới hạn số lượng lịch sử mỗi field
 
 export interface InputHistory {
@@ -106,18 +106,19 @@ export function clearAllHistory(): void {
 export function saveFormToHistory(formData: Record<string, string>): void {
     // Các field cần lưu lịch sử
     const fieldsToSave = [
-        'topic',
-        'subject',
+        'projectTitle',
+        'field',
         'level',
-        'grade',
+        'members',
+        'advisor',
         'school',
         'location',
-        'facilities',
-        'textbook',
+        'problem',
+        'objectives',
+        'hypothesis',
+        'methods',
         'researchSubjects',
         'timeframe',
-        'applyAI',
-        'focus',
         'specialRequirements'
     ];
 
