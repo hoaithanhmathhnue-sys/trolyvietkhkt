@@ -4,9 +4,10 @@ import { Button } from './Button';
 import { InputWithHistory, TextareaWithHistory } from './InputWithHistory';
 import { saveFormToHistory } from '../services/inputHistory';
 import { KHKT_FIELDS, FIELD_GROUPS, KHKT_LEVELS, RESEARCH_METHODS } from '../data/khktKnowledge';
-import { BookOpen, School, GraduationCap, PenTool, MapPin, Calendar, Users, Target, FileUp, Sparkles, Loader2, FileText, Search, X, ChevronDown, Beaker, FlaskConical, Lightbulb } from 'lucide-react';
+import { BookOpen, School, GraduationCap, PenTool, MapPin, Calendar, Users, Target, FileUp, Sparkles, Loader2, FileText, Search, X, ChevronDown, Beaker, FlaskConical, Lightbulb, AlertTriangle, Check } from 'lucide-react';
 import * as mammoth from 'mammoth';
 import * as pdfjsLib from 'pdfjs-dist';
+import { initializeGeminiChat, sendSinglePromptStream } from '../services/geminiService';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js`;
 
@@ -20,11 +21,14 @@ interface Props {
   selectedModel?: string;
 }
 
-const InputGroup: React.FC<{ label: string; icon: any; required?: boolean; children: React.ReactNode }> = ({ label, icon: Icon, required, children }) => (
+const InputGroup: React.FC<{ label: string; icon: any; required?: boolean; action?: React.ReactNode; children: React.ReactNode }> = ({ label, icon: Icon, required, action, children }) => (
   <div className="w-full">
-    <label className="block text-sm font-semibold text-gray-900 mb-1">
-      {label} {required && <span className="text-red-500">*</span>}
-    </label>
+    <div className="flex justify-between items-center mb-1">
+      <label className="block text-sm font-semibold text-gray-900">
+        {label} {required && <span className="text-red-500">*</span>}
+      </label>
+      {action}
+    </div>
     <div className="relative rounded-md shadow-sm">
       <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
         <Icon className="h-5 w-5 text-gray-400" />
@@ -36,7 +40,7 @@ const InputGroup: React.FC<{ label: string; icon: any; required?: boolean; child
 
 const MAX_FILE_SIZE = 100 * 1024 * 1024;
 
-export const KHKTForm: React.FC<Props> = ({ userInfo, onChange, onSubmit, onManualSubmit, isSubmitting }) => {
+export const KHKTForm: React.FC<Props> = ({ userInfo, onChange, onSubmit, onManualSubmit, isSubmitting, apiKey, selectedModel }) => {
   const [mode, setMode] = useState<'ai' | 'manual'>('ai');
   const [manualContent, setManualContent] = useState('');
   const [isProcessingRefFiles, setIsProcessingRefFiles] = useState(false);
@@ -48,6 +52,133 @@ export const KHKTForm: React.FC<Props> = ({ userInfo, onChange, onSubmit, onManu
   const [selectedGroup, setSelectedGroup] = useState<string | null>(null);
   const fieldDropdownRef = useRef<HTMLDivElement>(null);
   const refFileInputRef = useRef<HTMLInputElement>(null);
+
+  // States cho tính năng AI Gợi ý tên đề tài
+  const [isOpenTitleModal, setIsOpenTitleModal] = useState(false);
+  const [titleKeywords, setTitleKeywords] = useState('');
+  const [selectedTitleField, setSelectedTitleField] = useState(userInfo.field || '');
+  const [isGeneratingTitles, setIsGeneratingTitles] = useState(false);
+  const [suggestedTitles, setSuggestedTitles] = useState<{ title: string; novelty: string; explanation: string }[]>([]);
+  const [generationError, setGenerationError] = useState('');
+  const [showModalFieldDropdown, setShowModalFieldDropdown] = useState(false);
+  const [modalSelectedGroup, setModalSelectedGroup] = useState<string | null>(null);
+  const modalFieldDropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (isOpenTitleModal) {
+      setSelectedTitleField(userInfo.field || '');
+      setGenerationError('');
+    }
+  }, [isOpenTitleModal, userInfo.field]);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (modalFieldDropdownRef.current && !modalFieldDropdownRef.current.contains(e.target as Node)) {
+        setShowModalFieldDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  const generateTitles = async () => {
+    if (!apiKey) {
+      setGenerationError('Vui lòng nhập Gemini API Key trong phần Cài đặt ở góc trên bên phải trang trước khi sử dụng tính năng này.');
+      return;
+    }
+    if (!titleKeywords.trim()) {
+      setGenerationError('Vui lòng nhập một vài từ khóa hoặc mô tả ý tưởng ban đầu của bạn.');
+      return;
+    }
+    if (!selectedTitleField) {
+      setGenerationError('Vui lòng chọn một lĩnh vực nghiên cứu.');
+      return;
+    }
+
+    setIsGeneratingTitles(true);
+    setGenerationError('');
+    setSuggestedTitles([]);
+
+    try {
+      initializeGeminiChat(apiKey, selectedModel);
+
+      const prompt = `Bạn là một chuyên gia Thẩm định khoa học thuộc Hội đồng Khoa học Kỹ thuật cấp Quốc gia, có tri thức sâu rộng về các lĩnh vực nghiên cứu và xu hướng khoa học mới nhất dành cho học sinh trung học.
+
+Hãy gợi ý 5 tên đề tài nghiên cứu Khoa học Kỹ thuật (KHKT) sáng tạo, mới mẻ, độc đáo và hoàn toàn KHÔNG trùng lặp, KHÔNG đạo văn từ các nghiên cứu phổ biến.
+
+Yêu cầu về đề tài gợi ý:
+1. ĐÚNG CẤU TRÚC KHKT: Tên đề tài bắt đầu bằng các động từ khoa học như "Nghiên cứu...", "Thiết kế...", "Xây dựng...", "Chế tạo...", "Đánh giá...", "Phân tích...", v.v. và chỉ rõ đối tượng, phạm vi nghiên cứu rõ ràng.
+2. LĨNH VỰC NGHIÊN CỨU: ${selectedTitleField}
+3. Ý TƯỞNG / TỪ KHÓA BAN ĐẦU CỦA HỌC SINH: "${titleKeywords}"
+4. TÍNH MỚI & SÁNG TẠO: Mỗi đề tài cần chỉ ra rõ ràng "tính mới" đột phá hoặc hướng giải quyết sáng tạo hơn so với các phương pháp/thiết bị hiện tại để đảm bảo không bị trùng lắp hay đạo văn.
+5. PHÙ HỢP NĂNG LỰC: Phù hợp với năng lực học sinh THPT nhưng vẫn mang tính học thuật cao.
+
+Bạn BẮT BUỘC phải trả về kết quả dưới dạng một mảng JSON hợp lệ nằm trong một block code markdown \`\`\`json ... \`\`\`. Ngoài block code JSON này, không viết thêm bất kỳ lời thoại nào khác.
+
+Mỗi phần tử trong mảng JSON phải tuân thủ chính xác cấu trúc sau:
+{
+  "title": string,       // Tên đề tài gợi ý đúng chuẩn khoa học (VD: "Nghiên cứu chế tạo thiết bị lọc nước...")
+  "novelty": string,     // Phân tích tính mới và tính sáng tạo của đề tài (tại sao nó không trùng lặp, giải quyết vấn đề gì mới)
+  "explanation": string  // Giải thích ngắn gọn về hướng nghiên cứu cốt lõi và phương pháp đề xuất
+}
+
+Hãy sinh 5 đề tài xuất sắc nhất cho học sinh.`;
+
+      let fullText = '';
+      await sendSinglePromptStream(prompt, (chunk) => {
+        fullText += chunk;
+      });
+
+      // Trích xuất JSON từ markdown block code
+      const jsonRegex = /```json\s*([\s\S]*?)\s*```/;
+      const match = fullText.match(jsonRegex);
+      const jsonStr = match ? match[1] : fullText;
+
+      try {
+        const parsed = JSON.parse(jsonStr.trim());
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setSuggestedTitles(parsed);
+        } else {
+          throw new Error('Dữ liệu trả về không phải là mảng hợp lệ');
+        }
+      } catch (parseErr) {
+        console.error('Lỗi parse JSON gợi ý tiêu đề:', parseErr, 'Văn bản nhận được:', fullText);
+        // Trình phân tích dự phòng thô sơ nếu AI không trả về đúng định dạng
+        const fallbackTitles: { title: string; novelty: string; explanation: string }[] = [];
+        const lines = fullText.split('\n');
+        let currentTitle: any = {};
+        
+        for (const line of lines) {
+          const cleanLine = line.replace(/^\s*[-*•]\s*/, '').trim();
+          if (cleanLine.toLowerCase().includes('tiêu đề') || cleanLine.toLowerCase().includes('tên đề tài') || cleanLine.startsWith('1.') || cleanLine.startsWith('2.') || cleanLine.startsWith('3.') || cleanLine.startsWith('4.') || cleanLine.startsWith('5.')) {
+            if (currentTitle.title) {
+              fallbackTitles.push(currentTitle);
+              currentTitle = {};
+            }
+            currentTitle.title = cleanLine.substring(cleanLine.indexOf(':') + 1).replace(/^["'\s]+|["'\s]+$/g, '').trim();
+          } else if (cleanLine.toLowerCase().includes('tính mới') || cleanLine.toLowerCase().includes('sáng tạo')) {
+            currentTitle.novelty = cleanLine.substring(cleanLine.indexOf(':') + 1).trim();
+          } else if (cleanLine.toLowerCase().includes('giải thích') || cleanLine.toLowerCase().includes('hướng đi') || cleanLine.toLowerCase().includes('phương pháp')) {
+            currentTitle.explanation = cleanLine.substring(cleanLine.indexOf(':') + 1).trim();
+          }
+        }
+        if (currentTitle.title) {
+          fallbackTitles.push(currentTitle);
+        }
+
+        if (fallbackTitles.length > 0) {
+          setSuggestedTitles(fallbackTitles);
+        } else {
+          setGenerationError('Không thể phân tích kết quả gợi ý từ AI dưới dạng JSON. Vui lòng thử bấm nút tạo lại.');
+        }
+      }
+    } catch (err: any) {
+      console.error(err);
+      setGenerationError(err.message || 'Đã xảy ra lỗi kết nối với Gemini API. Vui lòng kiểm tra API key.');
+    } finally {
+      setIsGeneratingTitles(false);
+    }
+  };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     onChange(e.target.name as keyof UserInfo, e.target.value);
@@ -147,7 +278,20 @@ export const KHKTForm: React.FC<Props> = ({ userInfo, onChange, onSubmit, onManu
                 1. Thông tin đề tài (Bắt buộc)
               </h3>
               <div className="space-y-5">
-                <InputGroup label="Tên đề tài KHKT" icon={PenTool} required>
+                <InputGroup 
+                  label="Tên đề tài KHKT" 
+                  icon={PenTool} 
+                  required
+                  action={
+                    <button
+                      type="button"
+                      onClick={() => setIsOpenTitleModal(true)}
+                      className="text-xs font-semibold text-teal-600 hover:text-teal-800 flex items-center gap-1 bg-teal-50 hover:bg-teal-100 px-2.5 py-1 rounded-md transition-all border border-teal-200 hover:border-teal-300 shadow-sm"
+                    >
+                      <Sparkles className="w-3.5 h-3.5 animate-pulse" /> AI Gợi ý tên
+                    </button>
+                  }
+                >
                   <InputWithHistory name="projectTitle" value={userInfo.projectTitle} onChange={handleChange}
                     className="bg-gray-50 focus:bg-white focus:ring-teal-500 focus:border-teal-500 block w-full pl-10 text-sm border-gray-300 rounded-md p-3 border text-gray-900 placeholder-gray-500"
                     placeholder='VD: "Nghiên cứu khả năng xử lý nước thải bằng than hoạt tính từ vỏ trấu"' required />
@@ -367,6 +511,185 @@ export const KHKTForm: React.FC<Props> = ({ userInfo, onChange, onSubmit, onManu
           </div>
         )}
       </div>
+      {/* AI SUGGESTION MODAL */}
+      {isOpenTitleModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl border border-teal-100 max-w-3xl w-full max-h-[90vh] overflow-hidden flex flex-col transform transition-all duration-300">
+            {/* Modal Header */}
+            <div className="bg-gradient-to-r from-teal-600 to-emerald-600 px-6 py-4 text-white flex justify-between items-center shrink-0">
+              <div className="flex items-center gap-2">
+                <Lightbulb className="w-6 h-6 animate-pulse text-amber-300" />
+                <div>
+                  <h3 className="text-xl font-bold">Trợ Lý AI Gợi Ý Tên Đề Tài</h3>
+                  <p className="text-xs text-teal-100 opacity-90">Sáng tạo, Độc bản, Chuẩn cấu trúc KHKT</p>
+                </div>
+              </div>
+              <button 
+                type="button"
+                onClick={() => setIsOpenTitleModal(false)}
+                className="text-white/80 hover:text-white p-1 rounded-full hover:bg-white/10 transition-colors"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="overflow-y-auto p-6 space-y-5 flex-1">
+              {/* Field Selector */}
+              <div className="space-y-1">
+                <label className="block text-sm font-semibold text-gray-900">
+                  Lĩnh vực nghiên cứu <span className="text-red-500">*</span>
+                </label>
+                <div className="relative" ref={modalFieldDropdownRef}>
+                  <button
+                    type="button"
+                    onClick={() => setShowModalFieldDropdown(!showModalFieldDropdown)}
+                    className="w-full text-left bg-gray-50 hover:bg-gray-100 border border-gray-300 focus:ring-teal-500 focus:border-teal-500 rounded-lg p-3 text-sm flex justify-between items-center text-gray-900"
+                  >
+                    <span>{selectedTitleField || "Chọn lĩnh vực nghiên cứu..."}</span>
+                    <ChevronDown size={16} className={`text-gray-500 transition-transform ${showModalFieldDropdown ? 'rotate-180' : ''}`} />
+                  </button>
+
+                  {showModalFieldDropdown && (
+                    <div className="absolute z-50 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-xl max-h-60 overflow-y-auto">
+                      {/* Filter tabs */}
+                      <div className="sticky top-0 bg-white border-b p-2 flex flex-wrap gap-1">
+                        <button
+                          type="button"
+                          onClick={() => setModalSelectedGroup(null)}
+                          className={`px-2 py-0.5 text-xs rounded-full ${!modalSelectedGroup ? 'bg-teal-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+                        >
+                          Tất cả
+                        </button>
+                        {FIELD_GROUPS.map(g => (
+                          <button
+                            key={g}
+                            type="button"
+                            onClick={() => setModalSelectedGroup(g)}
+                            className={`px-2 py-0.5 text-xs rounded-full ${modalSelectedGroup === g ? 'bg-teal-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+                          >
+                            {g}
+                          </button>
+                        ))}
+                      </div>
+
+                      {/* Dropdown Options */}
+                      {(modalSelectedGroup ? KHKT_FIELDS.filter(f => f.group === modalSelectedGroup) : KHKT_FIELDS).map(f => (
+                        <button
+                          key={f.id}
+                          type="button"
+                          onClick={() => { setSelectedTitleField(f.name); setShowModalFieldDropdown(false); }}
+                          className={`w-full text-left px-3 py-2 text-sm hover:bg-teal-50 transition-colors ${selectedTitleField === f.name ? 'bg-teal-50 text-teal-700 font-medium' : 'text-gray-700'}`}
+                        >
+                          {f.name}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Idea input */}
+              <div className="space-y-1">
+                <label className="block text-sm font-semibold text-gray-900">
+                  Ý tưởng ban đầu / Từ khóa chính <span className="text-red-500">*</span>
+                </label>
+                <textarea
+                  value={titleKeywords}
+                  onChange={e => setTitleKeywords(e.target.value)}
+                  className="w-full bg-gray-50 border border-gray-300 rounded-lg p-3 text-sm focus:ring-teal-500 focus:border-teal-500 text-gray-900"
+                  placeholder="Nhập ý tưởng sơ khai hoặc các từ khóa, ví dụ: chế tạo robot dọn rác, lọc kim loại nặng trong giếng khoan bằng vỏ dừa..."
+                  rows={3}
+                />
+              </div>
+
+              {generationError && (
+                <div className="bg-red-50 border border-red-200 text-red-700 p-3.5 rounded-lg text-sm flex items-start gap-2">
+                  <AlertTriangle className="w-5 h-5 shrink-0 text-red-500 mt-0.5" />
+                  <p className="font-medium">{generationError}</p>
+                </div>
+              )}
+
+              {/* Generate Button */}
+              <button
+                type="button"
+                onClick={generateTitles}
+                disabled={isGeneratingTitles || !titleKeywords.trim() || !selectedTitleField}
+                className="w-full bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-700 hover:to-emerald-700 text-white font-bold py-3 rounded-lg shadow transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {isGeneratingTitles ? (
+                  <>
+                    <Loader2 className="animate-spin" size={18} />
+                    <span>Đang phân tích xu hướng và sáng tạo đề tài...</span>
+                  </>
+                ) : (
+                  <>
+                    <Sparkles size={18} />
+                    <span>Tạo 5 Gợi Ý Tên Đề Tài Độc Bản</span>
+                  </>
+                )}
+              </button>
+
+              {/* Suggested Titles List */}
+              {suggestedTitles.length > 0 && (
+                <div className="space-y-4 pt-3 border-t">
+                  <p className="text-sm font-semibold text-teal-800 flex items-center gap-1 uppercase tracking-wider">
+                    💡 Đề xuất từ AI (Nhấp để chọn đề tài):
+                  </p>
+                  <div className="space-y-3.5">
+                    {suggestedTitles.map((item, idx) => (
+                      <div 
+                        key={idx}
+                        className="bg-teal-50/30 hover:bg-teal-50/70 border border-teal-100 hover:border-teal-200 rounded-xl p-4 transition-all duration-200 text-left relative group shadow-sm flex flex-col justify-between"
+                      >
+                        <div className="space-y-2 mb-3">
+                          <h4 className="text-base font-bold text-gray-900 line-clamp-2">
+                            {idx + 1}. {item.title}
+                          </h4>
+                          <div className="text-xs space-y-1 mt-2">
+                            <p className="text-emerald-700 font-medium bg-emerald-50 p-2 rounded border border-emerald-100">
+                              <span className="font-bold text-emerald-800">✨ Tính mới:</span> {item.novelty}
+                            </p>
+                            <p className="text-gray-650 bg-gray-50 p-2 rounded border border-gray-100 mt-1">
+                              <span className="font-semibold text-gray-700">🔬 Phương pháp:</span> {item.explanation}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex justify-end shrink-0 mt-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              onChange('projectTitle', item.title);
+                              if (selectedTitleField) {
+                                onChange('field', selectedTitleField);
+                              }
+                              setIsOpenTitleModal(false);
+                            }}
+                            className="bg-teal-600 hover:bg-teal-700 text-white text-xs font-semibold py-1.5 px-3 rounded flex items-center gap-1 transition-all"
+                          >
+                            <Check size={14} /> Áp dụng đề tài
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="bg-gray-50 px-6 py-3 border-t flex justify-end shrink-0">
+              <button
+                type="button"
+                onClick={() => setIsOpenTitleModal(false)}
+                className="bg-white hover:bg-gray-100 text-gray-700 border border-gray-300 font-semibold py-2 px-4 rounded-lg text-sm transition-colors"
+              >
+                Đóng
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
