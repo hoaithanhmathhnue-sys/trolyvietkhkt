@@ -6,6 +6,7 @@ import { apiKeyManager } from './services/apiKeyManager';
 import { KHKT_FIELDS } from './data/khktKnowledge';
 import { KHKTForm } from './components/KHKTForm';
 import { DocumentPreview } from './components/DocumentPreview';
+import { AIActionPanel } from './components/AIActionPanel';
 import { Button } from './components/Button';
 import { ApiKeyModal } from './components/ApiKeyModal';
 import { Download, ChevronRight, Wand2, FileText, CheckCircle, RefreshCw, Settings, AlertTriangle, Save, Trash2 } from 'lucide-react';
@@ -980,179 +981,265 @@ ${FORMAT_RULES}`;
   };
 
   // Render Logic
+  // Tính thống kê từ fullDocument
+  const docWords = state.fullDocument ? state.fullDocument.split(/\s+/).filter(w => w).length : 0;
+  const docPages = Math.max(1, Math.ceil(docWords / 250));
+  const overallProgress = state.step >= GenerationStep.COMPLETED ? 100 : Math.round((state.step / GenerationStep.COMPLETED) * 100);
+
+  // Cấu trúc cây sidebar theo blueprint
+  const sidebarTree = [
+    { step: 0, icon: '📋', label: 'Thông tin dự án', desc: 'Nhập thông tin đề tài' },
+    { step: 1, icon: '📝', label: 'Dàn ý tổng quan', desc: 'Lập kế hoạch 4 chương' },
+    { step: 2, icon: '📖', label: 'A. PHẦN MỞ ĐẦU', desc: 'Lý do, Mục đích, Giả thuyết, PP', group: 'intro', children: [
+      'Lý do chọn đề tài', 'Mục đích nghiên cứu', 'Câu hỏi nghiên cứu',
+      'Giả thuyết khoa học', 'Đối tượng & Phạm vi', 'Phương pháp nghiên cứu',
+      'Cơ sở thực hiện', 'Ý nghĩa khoa học', 'Tính sáng tạo'
+    ]},
+    { step: -1, icon: '📖', label: 'B. NỘI DUNG', desc: '4 chương nghiên cứu', group: 'body', children: [
+      { step: 3, label: 'Chương 1: Tổng quan tài liệu', subs: ['Khái niệm', 'Tổng quan NC', 'Cơ sở lý thuyết'] },
+      { step: 4, label: 'Chương 2: PP nghiên cứu', subs: ['Đối tượng', 'PP khảo sát', 'Kết quả KS', 'Phân tích'] },
+      { step: 5, label: 'Chương 3: Kết quả', subs: ['Cơ sở đề xuất', 'Giải pháp', 'Thử nghiệm', 'Đánh giá'] },
+      { step: 6, label: 'Chương 4: Kết luận', subs: ['Tóm tắt', 'Kiến nghị', 'Hạn chế', 'Hướng phát triển'] },
+    ]},
+    { step: 7, icon: '📎', label: 'C. PHỤ LỤC', desc: 'TLTK, Phiếu KS, Số liệu' },
+  ];
+
+  const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({});
+  const toggleSection = (key: string) => setCollapsedSections(prev => ({ ...prev, [key]: !prev[key] }));
+
+  const getStepStatus = (stepNum: number) => {
+    if (state.error && state.step === stepNum) return 'error';
+    if (state.step === stepNum && state.isStreaming) return 'streaming';
+    if (state.step > stepNum) return 'done';
+    if (state.step === stepNum) return 'active';
+    return 'pending';
+  };
+
+  const StatusIcon = ({ status }: { status: string }) => {
+    if (status === 'error') return <AlertTriangle className="w-3.5 h-3.5 text-red-500" />;
+    if (status === 'streaming') return <div className="w-2 h-2 rounded-full bg-teal-500 animate-ping" />;
+    if (status === 'done') return <CheckCircle className="w-3.5 h-3.5 text-emerald-500" />;
+    if (status === 'active') return <div className="w-2.5 h-2.5 rounded-full bg-teal-500 ring-4 ring-teal-100" />;
+    return <div className="w-2 h-2 rounded-full bg-gray-300" />;
+  };
+
   const renderSidebar = () => {
     return (
-      <div className="w-full lg:w-80 bg-gradient-to-b from-white to-teal-50 border-r border-teal-100 p-6 flex-shrink-0 flex flex-col h-full overflow-y-auto shadow-[4px_0_24px_rgba(20,184,166,0.08)]">
-        <div className="mb-8">
-          <h1 className="text-xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-teal-600 to-emerald-500 flex items-center gap-2" style={{ fontFamily: 'Nunito, sans-serif' }}>
-            <Wand2 className="h-6 w-6 text-teal-500" />
-            TRỢ LÝ VIẾT KHKT 2026
+      <div className="w-full lg:w-80 bg-gradient-to-b from-white to-teal-50/50 border-r border-teal-100 flex-shrink-0 flex flex-col h-full overflow-y-auto shadow-[4px_0_24px_rgba(20,184,166,0.06)]">
+        {/* Header */}
+        <div className="p-5 pb-3">
+          <h1 className="text-lg font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-teal-600 to-emerald-500 flex items-center gap-2" style={{ fontFamily: 'Nunito, sans-serif' }}>
+            <Wand2 className="h-5 w-5 text-teal-500" />
+            KHKT WRITER PRO 2026
           </h1>
-          <p className="text-xs text-teal-700 font-medium mt-1.5 tracking-wide">🔬 Trợ lý viết đề tài Khoa học Kỹ thuật thông minh</p>
-        </div>
-
-        {/* Progress Stepper */}
-        <div className="space-y-6">
-          {Object.entries(STEPS_INFO).map(([key, info]) => {
-            const stepNum = parseInt(key);
-
-            // Ẩn step Phụ lục và Hoàn tất trên sidebar
-            if (stepNum >= GenerationStep.PHU_LUC) return null;
-
-            let statusColor = "text-gray-400 border-gray-200";
-            let icon = <div className="w-2 h-2 rounded-full bg-gray-300" />;
-
-            // ERROR STATE HANDLING
-            if (state.error && state.step === stepNum) {
-              statusColor = "text-red-600 border-red-600 bg-red-50";
-              icon = <AlertTriangle className="w-4 h-4 text-red-600" />;
-            }
-            else if (state.step === stepNum && state.isStreaming) {
-              statusColor = "text-sky-600 border-sky-600 bg-sky-50";
-              icon = <div className="w-2 h-2 rounded-full bg-sky-500 animate-ping" />;
-            } else if (state.step > stepNum) {
-              statusColor = "text-sky-800 border-sky-200";
-              icon = <CheckCircle className="w-4 h-4 text-sky-600" />;
-            } else if (state.step === stepNum) {
-              statusColor = "text-sky-600 border-sky-600 font-bold";
-              icon = <div className="w-2 h-2 rounded-full bg-sky-600" />;
-            }
-
-            // Cho phép click vào các step đã hoàn thành để quay lại sửa
-            const isClickable = state.step > stepNum && !state.isStreaming;
-            const handleStepClick = () => {
-              if (isClickable) {
-                setState(prev => ({ ...prev, step: stepNum }));
-              }
-            };
-
-            return (
-              <div
-                key={key}
-                onClick={handleStepClick}
-                className={`flex items - start pl - 4 border - l - 2 ${statusColor.includes('border-sky') ? 'border-sky-500' : statusColor.includes('border-red') ? 'border-red-500' : 'border-gray-200'} py - 1 transition - all ${isClickable ? 'cursor-pointer hover:bg-sky-50 rounded-r-lg' : ''} `}
-              >
-                <div className="flex-1">
-                  <h4 className={`text - sm ${statusColor.includes('text-sky') ? 'text-sky-900' : statusColor.includes('text-red') ? 'text-red-700' : 'text-gray-500'} font - medium`}>
-                    {state.error && state.step === stepNum ? "Đã dừng do lỗi" : info.label}
-                  </h4>
-                  <p className="text-xs text-gray-400">{info.description}</p>
-                </div>
-                <div className="ml-2 mt-1">
-                  {icon}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-
-        <div className="mt-auto pt-6 border-t border-gray-100">
+          {/* Stats bar */}
           {state.step > GenerationStep.INPUT_FORM && (
-            <div className="space-y-3">
-              <div className="p-3 bg-gray-50 rounded text-xs text-gray-500 border border-gray-100">
-                <span className="font-bold block text-gray-900">Đề tài:</span>
-                {userInfo.projectTitle}
+            <div className="mt-3 p-2.5 bg-teal-50 rounded-lg border border-teal-100">
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-[10px] font-semibold text-teal-700 uppercase tracking-wider">Tiến độ</span>
+                <span className="text-xs font-bold text-teal-600">{overallProgress}%</span>
+              </div>
+              <div className="w-full h-2 bg-teal-100 rounded-full overflow-hidden">
+                <div className="h-full bg-gradient-to-r from-teal-500 to-emerald-400 rounded-full transition-all duration-500" style={{ width: `${overallProgress}%` }} />
+              </div>
+              <div className="flex justify-between mt-2 text-[10px] text-teal-600">
+                <span>📝 {docWords.toLocaleString()} từ</span>
+                <span>📄 ~{docPages} trang</span>
+                <span>📊 {state.step}/{GenerationStep.COMPLETED} phần</span>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Tree Navigation */}
+        <div className="flex-1 overflow-y-auto px-3 pb-3">
+          <div className="space-y-0.5">
+            {sidebarTree.map((item, idx) => {
+              // Mục đơn (không phải group B. NỘI DUNG)
+              if (item.step >= 0 && !item.children) {
+                const status = getStepStatus(item.step);
+                const isClickable = state.step > item.step && !state.isStreaming;
+                return (
+                  <div key={idx}
+                    onClick={() => isClickable && setState(prev => ({ ...prev, step: item.step }))}
+                    className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-all ${
+                      status === 'active' ? 'bg-teal-100 text-teal-900 font-semibold' :
+                      status === 'done' ? 'text-gray-700 hover:bg-gray-50' :
+                      status === 'error' ? 'bg-red-50 text-red-700' :
+                      status === 'streaming' ? 'bg-teal-50 text-teal-700' :
+                      'text-gray-400'
+                    } ${isClickable ? 'cursor-pointer' : ''}`}
+                  >
+                    <span className="text-base">{item.icon}</span>
+                    <span className="flex-1 truncate">{item.label}</span>
+                    <StatusIcon status={status} />
+                  </div>
+                );
+              }
+
+              // Mục A. MỞ ĐẦU (có children là string[])
+              if (item.group === 'intro') {
+                const status = getStepStatus(item.step);
+                const isOpen = !collapsedSections['intro'];
+                const isClickable = state.step > item.step && !state.isStreaming;
+                return (
+                  <div key={idx}>
+                    <div
+                      onClick={() => { toggleSection('intro'); if (isClickable) setState(prev => ({ ...prev, step: item.step })); }}
+                      className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-all cursor-pointer ${
+                        status === 'active' ? 'bg-teal-100 text-teal-900 font-semibold' :
+                        status === 'done' ? 'text-gray-700 hover:bg-gray-50' :
+                        status === 'streaming' ? 'bg-teal-50 text-teal-700' :
+                        'text-gray-400'
+                      }`}
+                    >
+                      <span className="text-base">{item.icon}</span>
+                      <span className="flex-1">{item.label}</span>
+                      <StatusIcon status={status} />
+                      <ChevronRight className={`w-3.5 h-3.5 transition-transform ${isOpen ? 'rotate-90' : ''}`} />
+                    </div>
+                    {isOpen && (
+                      <div className="ml-7 mt-0.5 space-y-0 border-l-2 border-teal-100 pl-3">
+                        {(item.children as string[]).map((child, ci) => (
+                          <div key={ci} className="flex items-center gap-2 py-1 text-xs text-gray-500">
+                            <span className="w-1 h-1 rounded-full bg-gray-300 flex-shrink-0" />
+                            <span className="truncate">{ci + 1}. {child}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              }
+
+              // Mục B. NỘI DUNG (children là chapters)
+              if (item.group === 'body') {
+                const isOpen = !collapsedSections['body'];
+                const bodyChildren = item.children as Array<{ step: number; label: string; subs: string[] }>;
+                // Progress = bao nhiêu chương đã viết
+                const chaptersDone = bodyChildren.filter(ch => state.step > ch.step).length;
+                const bodyProgress = Math.round((chaptersDone / bodyChildren.length) * 100);
+                return (
+                  <div key={idx}>
+                    <div onClick={() => toggleSection('body')}
+                      className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm cursor-pointer text-gray-700 hover:bg-gray-50 transition-all"
+                    >
+                      <span className="text-base">{item.icon}</span>
+                      <span className="flex-1 font-medium">{item.label}</span>
+                      {bodyProgress > 0 && <span className="text-[10px] font-bold text-emerald-600">{bodyProgress}%</span>}
+                      <ChevronRight className={`w-3.5 h-3.5 transition-transform ${isOpen ? 'rotate-90' : ''}`} />
+                    </div>
+                    {isOpen && (
+                      <div className="ml-4 mt-0.5 space-y-0.5">
+                        {bodyChildren.map((ch, ci) => {
+                          const chStatus = getStepStatus(ch.step);
+                          const chClickable = state.step > ch.step && !state.isStreaming;
+                          const chKey = `ch${ci}`;
+                          const chOpen = !collapsedSections[chKey];
+                          return (
+                            <div key={ci}>
+                              <div
+                                onClick={() => { toggleSection(chKey); if (chClickable) setState(prev => ({ ...prev, step: ch.step })); }}
+                                className={`flex items-center gap-2 px-2.5 py-1.5 rounded-md text-xs transition-all ${
+                                  chStatus === 'active' ? 'bg-teal-50 text-teal-800 font-semibold' :
+                                  chStatus === 'done' ? 'text-gray-600' :
+                                  chStatus === 'streaming' ? 'bg-teal-50 text-teal-700' :
+                                  'text-gray-400'
+                                } ${chClickable ? 'cursor-pointer hover:bg-gray-50' : 'cursor-pointer'}`}
+                              >
+                                <StatusIcon status={chStatus} />
+                                <span className="flex-1 truncate">{ch.label}</span>
+                                <ChevronRight className={`w-3 h-3 transition-transform ${chOpen ? 'rotate-90' : ''}`} />
+                              </div>
+                              {chOpen && (
+                                <div className="ml-6 border-l border-gray-100 pl-2.5 space-y-0">
+                                  {ch.subs.map((sub, si) => (
+                                    <div key={si} className="flex items-center gap-1.5 py-0.5 text-[11px] text-gray-400">
+                                      <span className="w-1 h-1 rounded-full bg-gray-200 flex-shrink-0" />
+                                      <span className="truncate">{sub}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              }
+
+              return null;
+            })}
+          </div>
+        </div>
+
+        {/* Bottom Controls */}
+        <div className="p-4 border-t border-teal-100 bg-white/80 backdrop-blur-sm">
+          {state.step > GenerationStep.INPUT_FORM && (
+            <div className="space-y-2.5">
+              <div className="p-2.5 bg-gray-50 rounded-lg text-xs text-gray-500 border border-gray-100">
+                <span className="font-bold block text-gray-800 truncate">📌 {userInfo.projectTitle}</span>
+                {userInfo.field && <span className="text-[10px] text-teal-600">🔬 {userInfo.field}</span>}
               </div>
 
-              {/* Session persistence buttons */}
-              <div className="flex gap-2">
-                <button
-                  onClick={saveSession}
-                  className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-lg text-xs font-medium transition-colors border border-emerald-200"
-                  title="Lưu phiên làm việc"
+              {/* Session buttons */}
+              <div className="flex gap-1.5">
+                <button onClick={saveSession}
+                  className="flex-1 flex items-center justify-center gap-1 px-2 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-lg text-[11px] font-medium transition-colors border border-emerald-200"
                 >
-                  <Save size={13} />
-                  Lưu phiên
+                  <Save size={12} /> Lưu phiên
                 </button>
-                <button
-                  onClick={() => {
-                    if (confirm('Xóa phiên đã lưu? Bạn sẽ không thể khôi phục lại.')) {
-                      clearSavedSession();
-                    }
-                  }}
-                  className="flex items-center justify-center gap-1.5 px-3 py-2 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg text-xs font-medium transition-colors border border-red-200"
-                  title="Xóa phiên đã lưu"
+                <button onClick={() => { if (confirm('Xóa phiên đã lưu?')) clearSavedSession(); }}
+                  className="flex items-center justify-center px-2 py-1.5 bg-red-50 hover:bg-red-100 text-red-500 rounded-lg text-[11px] transition-colors border border-red-200"
                 >
-                  <Trash2 size={13} />
+                  <Trash2 size={12} />
                 </button>
               </div>
-              {sessionSavedAt && (
-                <p className="text-[10px] text-gray-400 text-center">
-                  💾 Lưu lúc {sessionSavedAt}
-                </p>
-              )}
+              {sessionSavedAt && <p className="text-[9px] text-gray-400 text-center">💾 {sessionSavedAt}</p>}
 
               {/* Controls */}
               {state.isStreaming ? (
-                <Button disabled className="w-full" isLoading>Đang viết...</Button>
+                <Button disabled className="w-full text-sm" isLoading>Đang viết...</Button>
               ) : (
                 state.step < GenerationStep.COMPLETED && (
                   <>
-                    {/* Feedback / Review Section only for OUTLINE Step */}
                     {state.step === GenerationStep.OUTLINE && (
-                      <div className="mb-2 space-y-2 border-t border-gray-100 pt-2">
-                        <p className="text-sm font-semibold text-sky-700">Điều chỉnh:</p>
-
-                        <div className="text-xs text-gray-500 italic mb-2">
-                          💡 Mẹo: Bạn có thể sửa trực tiếp Dàn ý ở màn hình bên phải trước khi bấm "Chốt & Viết tiếp".
-                        </div>
-
-                        <textarea
-                          value={outlineFeedback}
-                          onChange={(e) => setOutlineFeedback(e.target.value)}
-                          placeholder="Hoặc nhập yêu cầu để AI viết lại..."
-                          className="w-full p-2 text-sm border border-gray-300 rounded focus:ring-sky-500 focus:border-sky-500"
-                          rows={3}
+                      <div className="space-y-2 border-t border-gray-100 pt-2">
+                        <div className="text-[11px] text-gray-500 italic">💡 Sửa trực tiếp dàn ý bên phải hoặc nhập yêu cầu:</div>
+                        <textarea value={outlineFeedback} onChange={(e) => setOutlineFeedback(e.target.value)}
+                          placeholder="Nhập yêu cầu để AI viết lại..."
+                          className="w-full p-2 text-xs border border-gray-200 rounded-lg focus:ring-teal-500 focus:border-teal-500" rows={2}
                         />
-                        <Button
-                          variant="secondary"
-                          onClick={regenerateOutline}
-                          disabled={!outlineFeedback.trim()}
-                          className="w-full text-sm"
-                          icon={<RefreshCw size={14} />}
-                        >
-                          Yêu cầu AI viết lại
+                        <Button variant="secondary" onClick={regenerateOutline} disabled={!outlineFeedback.trim()} className="w-full text-xs" icon={<RefreshCw size={12} />}>
+                          AI viết lại dàn ý
                         </Button>
                       </div>
                     )}
-
-                    <Button onClick={generateNextSection} className="w-full" icon={<ChevronRight size={16} />}>
-                      {state.step === GenerationStep.OUTLINE ? 'Chốt Dàn ý & Viết tiếp' : 'Viết phần tiếp theo'}
+                    <Button onClick={generateNextSection} className="w-full text-sm" icon={<ChevronRight size={14} />}>
+                      {state.step === GenerationStep.OUTLINE ? 'Chốt & Viết tiếp' : 'Viết phần tiếp theo'}
                     </Button>
                   </>
                 )
               )}
 
-              {/* Nút xuất Word đề tài KHKT (luôn hiển thị khi đã có nội dung) */}
-              {(state.step >= GenerationStep.OUTLINE) && (
-                <Button variant="secondary" onClick={exportToWord} className="w-full" icon={<Download size={16} />}>
-                  Xuất file Word KHKT
+              {state.step >= GenerationStep.OUTLINE && (
+                <Button variant="secondary" onClick={exportToWord} className="w-full text-sm" icon={<Download size={14} />}>
+                  📥 Xuất Word KHKT
                 </Button>
               )}
 
-              {/* Sau khi hoàn thành đề tài KHKT: hiển thị các nút phụ lục */}
               {state.step >= GenerationStep.COMPLETED && (
-                <>
-                  {!appendixDocument ? (
-                    <Button
-                      onClick={generateAppendix}
-                      isLoading={isAppendixLoading}
-                      className="w-full bg-emerald-600 hover:bg-emerald-700"
-                      icon={<FileText size={16} />}
-                    >
-                      {isAppendixLoading ? 'Đang tạo phụ lục...' : 'TẠO PHỤ LỤC'}
-                    </Button>
-                  ) : (
-                    <Button
-                      variant="secondary"
-                      onClick={exportAppendixToWord}
-                      className="w-full border-emerald-500 text-emerald-700 hover:bg-emerald-50"
-                      icon={<Download size={16} />}
-                    >
-                      Xuất Word Phụ lục
-                    </Button>
-                  )}
-                </>
+                !appendixDocument ? (
+                  <Button onClick={generateAppendix} isLoading={isAppendixLoading} className="w-full bg-emerald-600 hover:bg-emerald-700 text-sm" icon={<FileText size={14} />}>
+                    {isAppendixLoading ? 'Đang tạo phụ lục...' : 'TẠO PHỤ LỤC'}
+                  </Button>
+                ) : (
+                  <Button variant="secondary" onClick={exportAppendixToWord} className="w-full border-emerald-500 text-emerald-700 text-sm" icon={<Download size={14} />}>
+                    Xuất Word Phụ lục
+                  </Button>
+                )
               )}
             </div>
           )}
@@ -1394,24 +1481,42 @@ ${FORMAT_RULES}`;
             />
           </div>
         ) : (
-          <div className="flex-1 flex flex-col min-h-0 relative">
-            <DocumentPreview
-              content={state.fullDocument}
-              onUpdate={handleDocumentUpdate}
-              // Only allow direct editing in the OUTLINE step and when not streaming
-              isEditable={state.step === GenerationStep.OUTLINE && !state.isStreaming}
-            />
+          <div className="flex-1 flex flex-col lg:flex-row gap-6 min-h-0 relative">
+            <div className="flex-1 flex flex-col min-h-0 relative">
+              <DocumentPreview
+                content={state.fullDocument}
+                onUpdate={handleDocumentUpdate}
+                isEditable={!state.isStreaming}
+              />
 
-            {/* Mobile Controls Floating */}
-            <div className="lg:hidden absolute bottom-4 left-4 right-4 flex gap-2 shadow-lg">
-              {!state.isStreaming && state.step < GenerationStep.COMPLETED && (
-                <Button onClick={generateNextSection} className="flex-1 shadow-xl">
-                  {state.step === GenerationStep.OUTLINE ? 'Chốt & Tiếp tục' : 'Viết tiếp'}
+              {/* Mobile Controls Floating */}
+              <div className="lg:hidden absolute bottom-4 left-4 right-4 flex gap-2 shadow-lg z-20">
+                {!state.isStreaming && state.step < GenerationStep.COMPLETED && (
+                  <Button onClick={generateNextSection} className="flex-1 shadow-xl">
+                    {state.step === GenerationStep.OUTLINE ? 'Chốt & Tiếp tục' : 'Viết tiếp'}
+                  </Button>
+                )}
+                <Button onClick={exportToWord} variant="secondary" className="bg-white shadow-xl text-sky-700">
+                  <Download size={20} />
                 </Button>
-              )}
-              <Button onClick={exportToWord} variant="secondary" className="bg-white shadow-xl text-sky-700">
-                <Download size={20} />
-              </Button>
+              </div>
+            </div>
+
+            <div className="w-full lg:w-[400px] flex-shrink-0 flex flex-col min-h-0 bg-white shadow-xl rounded-xl border border-gray-200 overflow-hidden">
+              <AIActionPanel
+                apiKey={apiKey}
+                selectedModel={selectedModel}
+                currentStep={state.step}
+                documentContent={state.fullDocument}
+                projectInfo={userInfo}
+                onUpdateDocument={handleDocumentUpdate}
+                onInsertText={(text) => {
+                  setState(prev => ({
+                    ...prev,
+                    fullDocument: prev.fullDocument + "\n\n" + text
+                  }));
+                }}
+              />
             </div>
           </div>
         )}
