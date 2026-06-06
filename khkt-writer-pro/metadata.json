@@ -1,0 +1,6 @@
+{
+  "name": "KHKT Writer Pro",
+  "description": "Trợ lý viết đề tài Khoa học Kỹ thuật thông minh cho học sinh",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

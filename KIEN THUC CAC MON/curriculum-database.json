@@ -1,0 +1,828 @@
+{
+  "metadata": {
+    "version": "1.0",
+    "curriculum": "GDPT 2018",
+    "country": "Vietnam",
+    "lastUpdated": "2026-04-08",
+    "description": "Database phạm vi kiến thức chuẩn các môn học, cấp lớp theo chương trình giáo dục phổ thông 2018 Việt Nam"
+  },
+  "stages": {
+    "elementarySchool": {
+      "name": "Tiểu học",
+      "grades": [1, 2, 3, 4, 5],
+      "subjects": ["Toán", "Tiếng Việt", "Tiếng Anh", "Khoa học", "Lịch sử Địa lí", "Giáo dục công dân", "Thể dục", "Âm nhạc", "Mỹ thuật", "Tin học"]
+    },
+    "secondarySchool": {
+      "name": "THCS (Trung học cơ sở)",
+      "grades": [6, 7, 8, 9],
+      "description": "Giai đoạn giáo dục cơ bản",
+      "subjects": [
+        "Toán",
+        "Ngữ văn",
+        "Tiếng Anh",
+        "Giáo dục công dân",
+        "Khoa học tự nhiên",
+        "Lịch sử và Địa lí",
+        "Công nghệ",
+        "Tin học",
+        "Giáo dục thể chất",
+        "Nghệ thuật"
+      ]
+    },
+    "highSchool": {
+      "name": "THPT (Trung học phổ thông)",
+      "grades": [10, 11, 12],
+      "description": "Giai đoạn giáo dục định hướng nghề nghiệp",
+      "subjects": [
+        "Toán",
+        "Ngữ văn",
+        "Tiếng Anh",
+        "Lịch sử",
+        "Địa lí",
+        "Giáo dục công dân",
+        "Vật lí",
+        "Hoá học",
+        "Sinh học",
+        "Công nghệ",
+        "Tin học",
+        "Giáo dục thể chất",
+        "Nghệ thuật"
+      ]
+    }
+  },
+  "subjects": {
+    "toan": {
+      "name": "Toán",
+      "grades": {
+        "6": {
+          "stage": "THCS",
+          "topics": [
+            "Tập hợp số tự nhiên",
+            "Phép cộng trừ nhân chia số tự nhiên",
+            "Ước, bội, ước chung lớn nhất, bội chung nhỏ nhất",
+            "Phân số",
+            "Phép toán trên phân số",
+            "Số thập phân",
+            "Hình học cơ bản (điểm, đường thẳng, góc)",
+            "Thống kê cơ bản"
+          ],
+          "forbiddenKeywords": [
+            "phương trình bậc hai",
+            "nguyên hàm",
+            "tích phân",
+            "lôgarit",
+            "hàm mũ",
+            "hàm số bậc ba",
+            "đạo hàm",
+            "căn bậc ba",
+            "tỉ số lượng giác",
+            "số phức"
+          ]
+        },
+        "7": {
+          "stage": "THCS",
+          "topics": [
+            "Số hữu tỉ",
+            "Số vô tỉ",
+            "Căn bậc hai",
+            "Giá trị tuyệt đối",
+            "Hàm số bậc nhất y = ax + b",
+            "Đồ thị hàm số bậc nhất",
+            "Hệ hai phương trình bậc nhất hai ẩn",
+            "Định lí Pytago",
+            "Tam giác đồng dạng",
+            "Hình học phẳng cơ bản"
+          ],
+          "forbiddenKeywords": [
+            "phương trình bậc hai",
+            "nguyên hàm",
+            "tích phân",
+            "lôgarit",
+            "đạo hàm",
+            "hàm lượng giác",
+            "số phức",
+            "giới hạn"
+          ]
+        },
+        "8": {
+          "stage": "THCS",
+          "topics": [
+            "Biểu thức đại số",
+            "Phương trình bậc nhất một ẩn",
+            "Hệ phương trình bậc nhất hai ẩn",
+            "Bất phương trình bậc nhất một ẩn",
+            "Tứ giác",
+            "Hình chữ nhật, hình thoi, hình vuông",
+            "Diện tích các hình",
+            "Đường tròn",
+            "Thống kê dữ liệu"
+          ],
+          "forbiddenKeywords": [
+            "phương trình bậc hai",
+            "nguyên hàm",
+            "tích phân",
+            "lôgarit",
+            "đạo hàm",
+            "căn bậc ba",
+            "hàm lượng giác",
+            "số phức"
+          ]
+        },
+        "9": {
+          "stage": "THCS",
+          "topics": [
+            "Căn thức bậc hai",
+            "Phương trình bậc hai một ẩn",
+            "Hệ phương trình",
+            "Bất đẳng thức",
+            "Hàm số y = ax² (a ≠ 0)",
+            "Tỉ số lượng giác của góc nhọn",
+            "Hệ thức lượng trong tam giác vuông",
+            "Đường tròn",
+            "Hình trụ, hình nón, hình cầu",
+            "Thống kê và xác suất cơ bản"
+          ],
+          "forbiddenKeywords": [
+            "nguyên hàm",
+            "tích phân",
+            "lôgarit",
+            "đạo hàm",
+            "hàm mũ",
+            "số phức",
+            "ma trận",
+            "vectơ trong không gian"
+          ]
+        },
+        "10": {
+          "stage": "THPT",
+          "topics": [
+            "Mệnh đề logic",
+            "Tập hợp",
+            "Hàm số bậc nhất, bậc hai",
+            "Phương trình, bất phương trình bậc nhất, bậc hai",
+            "Bất đẳng thức Cauchy",
+            "Phương trình, bất phương trình vô tỉ",
+            "Hệ phương trình",
+            "Vector và các phép toán",
+            "Tích vô hướng",
+            "Hệ thức lượng trong tam giác"
+          ],
+          "forbiddenKeywords": [
+            "nguyên hàm",
+            "tích phân",
+            "lôgarit",
+            "đạo hàm",
+            "xác suất có điều kiện",
+            "số phức"
+          ]
+        },
+        "11": {
+          "stage": "THPT",
+          "topics": [
+            "Hàm số lượng giác",
+            "Phương trình lượng giác",
+            "Dãy số",
+            "Cấp số cộng, cấp số nhân",
+            "Giới hạn",
+            "Đạo hàm",
+            "Tính chất và ứng dụng của đạo hàm",
+            "Xác suất",
+            "Vectơ trong không gian",
+            "Hình học không gian cơ bản"
+          ],
+          "forbiddenKeywords": [
+            "nguyên hàm",
+            "tích phân",
+            "lôgarit",
+            "hàm mũ",
+            "số phức",
+            "ma trận"
+          ]
+        },
+        "12": {
+          "stage": "THPT",
+          "topics": [
+            "Ứng dụng đạo hàm để khảo sát hàm số",
+            "Nguyên hàm",
+            "Tích phân",
+            "Ứng dụng của tích phân",
+            "Hàm số mũ, hàm số lôgarit",
+            "Phương trình, bất phương trình mũ và lôgarit",
+            "Vector và tọa độ trong không gian",
+            "Phương trình mặt phẳng, đường thẳng, mặt cầu",
+            "Các số đặc trưng của mẫu số liệu",
+            "Xác suất có điều kiện",
+            "Công thức xác suất toàn phần, Bayes"
+          ],
+          "forbiddenKeywords": [
+            "số phức",
+            "ma trận",
+            "phương pháp quy nạp toán học"
+          ]
+        }
+      }
+    },
+    "nguVan": {
+      "name": "Ngữ văn",
+      "grades": {
+        "6": {
+          "stage": "THCS",
+          "topics": [
+            "Luyện tập đọc hiểu cơ bản",
+            "Thơ ca, truyện ngắn",
+            "Văn bản thông tin",
+            "Ngữ pháp cơ bản (từ loại, câu đơn)",
+            "Từ vựng, cách dùng từ",
+            "Chính tả",
+            "Luyện nói, thuyết trình cơ bản"
+          ],
+          "forbiddenKeywords": [
+            "phân tích sâu tác phẩm cổ điển",
+            "lý thuyết văn học nâng cao",
+            "tu từ phức tạp",
+            "phân tích ngôn ngữ học sâu"
+          ]
+        },
+        "7": {
+          "stage": "THCS",
+          "topics": [
+            "Các thể loại văn học (thơ, truyện ngắn, truyện dài)",
+            "Nhân vật, cốt truyện, chủ đề",
+            "Phương pháp kể chuyện",
+            "Giá trị biểu cảm, giá trị nhận thức",
+            "Ngữ pháp câu phức",
+            "Một số biện pháp nghệ thuật cơ bản (ẩn dụ, nhân hoá)",
+            "Kĩ năng viết (tut mèo, kể chuyện)"
+          ],
+          "forbiddenKeywords": [
+            "lý thuyết văn học hiện đại",
+            "phân tích cấu trúc tác phẩm nâng cao",
+            "dòng trào văn học"
+          ]
+        },
+        "8": {
+          "stage": "THCS",
+          "topics": [
+            "Các thể loại văn học (tiếp tục mở rộng)",
+            "Chủ thể trữ tình, nhân vật trữ tình",
+            "Tín năng trữ tình",
+            "Yếu tố hình thức của tác phẩm",
+            "Biện pháp tu từ (so sánh, nói chuyện, hoán dụ)",
+            "Phân tích tác phẩm văn học",
+            "Viết văn nghị luận cơ bản"
+          ],
+          "forbiddenKeywords": [
+            "lý thuyết văn học chuyên sâu",
+            "phân tích nguyên liệu lịch sử văn học",
+            "dòng trào và trường phái"
+          ]
+        },
+        "9": {
+          "stage": "THCS",
+          "topics": [
+            "Tổng kết văn học THCS",
+            "Tác phẩm đại diện các thể loại",
+            "Phân tích tác phẩm chi tiết",
+            "Kỹ năng viết văn chính thức",
+            "Viết bài báo, thông cáo",
+            "Nội dung và hình thức của tác phẩm",
+            "Sự liên hệ giữa các tác phẩm"
+          ],
+          "forbiddenKeywords": [
+            "lý thuyết văn học THPT",
+            "phân tích lịch sử văn học"
+          ]
+        },
+        "10": {
+          "stage": "THPT",
+          "topics": [
+            "Giáo dục văn học THPT",
+            "Các thể loại văn học ở THPT",
+            "Văn bản phi hư cấu (thông tin, chính luận)",
+            "Yếu tố hình thức và nội dung tác phẩm",
+            "Biện pháp nghệ thuật",
+            "Kỹ năng viết luận văn"
+          ],
+          "forbiddenKeywords": []
+        },
+        "11": {
+          "stage": "THPT",
+          "topics": [
+            "Văn học dân tộc các thời kỳ",
+            "Lịch sử văn học Việt Nam",
+            "Lí thuyết văn học cơ bản",
+            "Phân tích tác phẩm",
+            "Chuyên đề tập nghiên cứu"
+          ],
+          "forbiddenKeywords": []
+        },
+        "12": {
+          "stage": "THPT",
+          "topics": [
+            "Tổng kết văn học THPT",
+            "Lịch sử văn học Việt Nam tổng hợp",
+            "Các tác phẩm đại diện",
+            "Phân tích thẩm mỹ tác phẩm",
+            "Viết luận tiểu luận",
+            "Chuyên đề tập nghiên cứu"
+          ],
+          "forbiddenKeywords": []
+        }
+      }
+    },
+    "diaLi": {
+      "name": "Địa lí / Lịch sử và Địa lí (THCS)",
+      "grades": {
+        "6": {
+          "stage": "THCS",
+          "topics": [
+            "Địa lí đại cương",
+            "Trái Đất, bản đồ, tọa độ",
+            "Kinh độ, vĩ độ",
+            "Các lục địa, đại dương",
+            "Khí hậu, thời tiết cơ bản",
+            "Sinh vật, sinh quyển",
+            "Dân cư, xã hội cơ bản"
+          ],
+          "forbiddenKeywords": [
+            "địa lí kinh tế nâng cao",
+            "phân tích lịch sử sâu",
+            "địa chính trị"
+          ]
+        },
+        "7": {
+          "stage": "THCS",
+          "topics": [
+            "Địa lí các châu lục",
+            "Châu Á, châu Âu, châu Mỹ, châu Phi, châu Đại Dương",
+            "Đặc điểm tự nhiên, dân cư của các châu lục",
+            "Các cuộc đại phát kiến địa lí",
+            "Đô thị: Lịch sử và hiện tại",
+            "Các nước láng giềng Việt Nam"
+          ],
+          "forbiddenKeywords": [
+            "phân tích địa chính trị sâu",
+            "lịch sử ngoại giao"
+          ]
+        },
+        "8": {
+          "stage": "THCS",
+          "topics": [
+            "Địa lí tự nhiên Việt Nam",
+            "Vị trí, biên giới của Việt Nam",
+            "Địa hình, khí hậu, thủy văn",
+            "Tài nguyên thiên nhiên",
+            "Động vật, thực vật Việt Nam",
+            "Bảo vệ môi trường",
+            "Văn minh châu thổ sông Hồng",
+            "Chủ quyền Việt Nam ở Biển Đông"
+          ],
+          "forbiddenKeywords": [
+            "kinh tế-xã hội nâng cao",
+            "phân tích chính trị sâu"
+          ]
+        },
+        "9": {
+          "stage": "THCS",
+          "topics": [
+            "Địa lí kinh tế-xã hội Việt Nam",
+            "Dân cư, lao động",
+            "Nông nghiệp, lâm nghiệp, thủy sản",
+            "Công nghiệp, giao thông vận tải",
+            "Thương mại, du lịch",
+            "Các vùng kinh tế Việt Nam",
+            "Phát triển bền vững"
+          ],
+          "forbiddenKeywords": [
+            "phân tích địa chính trị",
+            "kinh tế lượng tử"
+          ]
+        },
+        "10": {
+          "stage": "THPT",
+          "topics": [
+            "Địa lí tổng quát",
+            "Địa hình, khí hậu, nước",
+            "Đất, thổ nhưỡng",
+            "Địa lí sinh vật",
+            "Nước biển, hoạt động địa chất"
+          ],
+          "forbiddenKeywords": []
+        },
+        "11": {
+          "stage": "THPT",
+          "topics": [
+            "Địa lí kinh tế",
+            "Dân số, lao động",
+            "Nông nghiệp, công nghiệp",
+            "Giao thông, thương mại",
+            "Các ngành kinh tế chủ yếu"
+          ],
+          "forbiddenKeywords": []
+        },
+        "12": {
+          "stage": "THPT",
+          "topics": [
+            "Địa lí Việt Nam",
+            "Tài nguyên, dân cư, kinh tế",
+            "Các vùng kinh tế, các tỉnh thành",
+            "Phát triển bền vững",
+            "Quan hệ kinh tế quốc tế"
+          ],
+          "forbiddenKeywords": []
+        }
+      }
+    },
+    "lichSu": {
+      "name": "Lịch sử / Lịch sử và Địa lí (THCS)",
+      "grades": {
+        "6": {
+          "stage": "THCS",
+          "topics": [
+            "Lịch sử cổ đại thế giới",
+            "Văn minh Ai Cập, Lưỡng Hà, Ấn Độ, Trung Quốc",
+            "Lịch sử cổ đại Việt Nam",
+            "Nước Âu Lạc",
+            "Sự thay đổi xã hội, kinh tế cơ bản"
+          ],
+          "forbiddenKeywords": [
+            "phân tích lý thuyết lịch sử nâng cao",
+            "tiểu luận lịch sử"
+          ]
+        },
+        "7": {
+          "stage": "THCS",
+          "topics": [
+            "Lịch sử trung đại thế giới",
+            "Đế chế Hồi giáo, phong kiến châu Âu",
+            "Lịch sử trung đại Việt Nam",
+            "Độc lập và phát triển",
+            "Sự phát triển kinh tế, đô thị"
+          ],
+          "forbiddenKeywords": [
+            "phân tích ý thức hệ",
+            "lý thuyết xã hội học"
+          ]
+        },
+        "8": {
+          "stage": "THCS",
+          "topics": [
+            "Lịch sử cận đại thế giới",
+            "Phục hưng, khai sáng",
+            "Cách mạng công nghiệp",
+            "Lịch sử cận đại Việt Nam",
+            "Thực dân Pháp",
+            "Phong trào kháng chiến"
+          ],
+          "forbiddenKeywords": [
+            "phân tích địa chính trị"
+          ]
+        },
+        "9": {
+          "stage": "THCS",
+          "topics": [
+            "Lịch sử hiện đại thế giới",
+            "Thế chiến I, II",
+            "Cuộc cách mạng tháng 10 Nga",
+            "Lịch sử hiện đại Việt Nam",
+            "Cách mạng tháng Tám",
+            "Độc lập nước Việt Nam",
+            "Xây dựng và bảo vệ nước Việt"
+          ],
+          "forbiddenKeywords": []
+        },
+        "10": {
+          "stage": "THPT",
+          "topics": [
+            "Lịch sử thế giới cơ bản",
+            "Từ cổ đại đến hiện đại",
+            "Các sự kiện, nhân vật lịch sử lớn"
+          ],
+          "forbiddenKeywords": []
+        },
+        "11": {
+          "stage": "THPT",
+          "topics": [
+            "Lịch sử Việt Nam",
+            "Từ cổ đại đến hiện đại",
+            "Độc lập dân tộc",
+            "Chuyên đề lịch sử"
+          ],
+          "forbiddenKeywords": []
+        },
+        "12": {
+          "stage": "THPT",
+          "topics": [
+            "Tổng kết lịch sử",
+            "Những bài học từ lịch sử",
+            "Phát triển bền vững",
+            "Chuyên đề tập nghiên cứu"
+          ],
+          "forbiddenKeywords": []
+        }
+      }
+    },
+    "tiengAnh": {
+      "name": "Tiếng Anh",
+      "grades": {
+        "6": {
+          "stage": "THCS",
+          "topics": [
+            "Giới thiệu bản thân",
+            "Thành viên gia đình",
+            "Những vật dụng hàng ngày",
+            "Các phòng trong nhà",
+            "Thức ăn, đồ uống",
+            "Thời tiết, mùa",
+            "Ngôn pháp cơ bản (hiện tại đơn, hiện tại tiếp diễn)"
+          ],
+          "forbiddenKeywords": [
+            "điều kiện thực tế",
+            "câu điều kiện phức tạp",
+            "thể bị động nâng cao"
+          ]
+        },
+        "7": {
+          "stage": "THCS",
+          "topics": [
+            "Hoạt động hàng ngày",
+            "Sở thích, thú vui",
+            "Thể thao",
+            "Mua sắm",
+            "Du lịch",
+            "Ngôn pháp (quá khứ đơn, quá khứ tiếp diễn)",
+            "Câu so sánh"
+          ],
+          "forbiddenKeywords": [
+            "phân tích văn bản nâng cao",
+            "thể bị động phức tạp"
+          ]
+        },
+        "8": {
+          "stage": "THCS",
+          "topics": [
+            "Công việc, nghề nghiệp",
+            "Giáo dục, trường học",
+            "Sức khỏe, bệnh tật",
+            "Bộ phận cơ thể",
+            "Tương lai đơn",
+            "Thể bị động",
+            "Câu điều kiện loại I, II"
+          ],
+          "forbiddenKeywords": [
+            "thể bị động câu phức",
+            "reported speech nâng cao"
+          ]
+        },
+        "9": {
+          "stage": "THCS",
+          "topics": [
+            "Công nghệ, máy tính",
+            "Môi trường, bảo vệ đất nước",
+            "Văn hóa, truyền thống",
+            "Tương lai hoàn thành",
+            "Điều kiện loại III",
+            "Reported speech cơ bản",
+            "Động từ khuyết thiếu"
+          ],
+          "forbiddenKeywords": []
+        },
+        "10": {
+          "stage": "THPT",
+          "topics": [
+            "Luyện tập ngôn pháp THPT",
+            "Mở rộng vựng",
+            "Đọc hiểu",
+            "Viết đoạn văn"
+          ],
+          "forbiddenKeywords": []
+        },
+        "11": {
+          "stage": "THPT",
+          "topics": [
+            "Tiếng Anh nâng cao",
+            "Phân tích bài đọc",
+            "Luyện thi"
+          ],
+          "forbiddenKeywords": []
+        },
+        "12": {
+          "stage": "THPT",
+          "topics": [
+            "Luyện thi THPT quốc gia",
+            "Kỹ năng toàn diện",
+            "Chuyên đề"
+          ],
+          "forbiddenKeywords": []
+        }
+      }
+    },
+    "khoanHocTuNhien": {
+      "name": "Khoa học tự nhiên (THCS) / Vật lí, Hoá học, Sinh học (THPT)",
+      "grades": {
+        "6": {
+          "stage": "THCS",
+          "topics": [
+            "Một số khái niệm cơ bản về vật chất",
+            "Hiện tượng tự nhiên",
+            "Chuyển động",
+            "Lực",
+            "Ánh sáng, âm thanh cơ bản",
+            "Nhiệt năng",
+            "Sự sống, sinh vật",
+            "Sinh sản sinh vật"
+          ],
+          "forbiddenKeywords": [
+            "phương trình hoá học phức tạp",
+            "phản ứng hạt nhân",
+            "cơ chế sinh hóa"
+          ]
+        },
+        "7": {
+          "stage": "THCS",
+          "topics": [
+            "Động lực học",
+            "Công, năng lượng cơ bản",
+            "Điện học cơ bản (mạch điện)",
+            "Từ tính",
+            "Sóng âm, sóng ánh sáng cơ bản",
+            "Phản ứng hoá học cơ bản",
+            "Thành phần vật chất",
+            "Thức ăn, tiêu hóa"
+          ],
+          "forbiddenKeywords": [
+            "lý thuyết hoá học nâng cao",
+            "quang phổ",
+            "cơ chế phức tạp"
+          ]
+        },
+        "8": {
+          "stage": "THCS",
+          "topics": [
+            "Áp suất",
+            "Thuyết động học phân tử",
+            "Nhiệt độ, nhiệt lượng",
+            "Độ tan, dung dịch",
+            "Phản ứng hoá học",
+            "Oxid - khử",
+            "Axit, bazơ, muối cơ bản",
+            "Cơ thể con người (tuần hoàn, hô hấp)"
+          ],
+          "forbiddenKeywords": [
+            "cân bằng hóa học nâng cao",
+            "thủy phân phức tạp",
+            "sinh hóa"
+          ]
+        },
+        "9": {
+          "stage": "THCS",
+          "topics": [
+            "Phóng xạ cơ bản",
+            "Dòng điện, điện trở",
+            "Công suất điện",
+            "Cảm ứng điện từ",
+            "Tổng hợp hoá học",
+            "Metals, nonmetals",
+            "Hệ sinh thái",
+            "Thích ứng, tiến hóa cơ bản"
+          ],
+          "forbiddenKeywords": [
+            "cơ học lượng tử",
+            "hóa học hữu cơ nâng cao"
+          ]
+        },
+        "10": {
+          "stage": "THPT",
+          "topics": [
+            "Chuyển động, lực",
+            "Công, năng lượng",
+            "Động lực học chất điểm",
+            "Chuyển động tròn"
+          ],
+          "forbiddenKeywords": []
+        },
+        "11": {
+          "stage": "THPT",
+          "topics": [
+            "Giao thoa ánh sáng",
+            "Hiệu ứng quang điện",
+            "Sóng cơ, sóng điện từ",
+            "Điện xoay chiều",
+            "Cảm ứng điện từ"
+          ],
+          "forbiddenKeywords": []
+        },
+        "12": {
+          "stage": "THPT",
+          "topics": [
+            "Vật lí hạt nhân",
+            "Phản ứng hạt nhân",
+            "Hoá học hữu cơ",
+            "Hoá học vô cơ nâng cao",
+            "Sinh học phân tử"
+          ],
+          "forbiddenKeywords": []
+        }
+      }
+    },
+    "giaoDucCongDan": {
+      "name": "Giáo dục công dân",
+      "grades": {
+        "6": {
+          "stage": "THCS",
+          "topics": [
+            "Pháp luật cơ bản",
+            "Quyền và bổn phận của công dân",
+            "Luật bảo vệ trẻ em",
+            "Gia đình, nhà trường, cộng đồng",
+            "Chịu trách nhiệm với gia đình"
+          ],
+          "forbiddenKeywords": [
+            "luật hình sự phức tạp",
+            "tranh chấp dân sự nâng cao"
+          ]
+        },
+        "7": {
+          "stage": "THCS",
+          "topics": [
+            "Quyền con người",
+            "Tự do cá nhân",
+            "Bình đẳng, công bằng xã hội",
+            "Danh dự, nhân phẩm",
+            "Trách nhiệm pháp lý cơ bản"
+          ],
+          "forbiddenKeywords": []
+        },
+        "8": {
+          "stage": "THCS",
+          "topics": [
+            "Pháp luật tố tụng",
+            "Tội phạm, xử phạt",
+            "Tuân thủ luật pháp",
+            "Hiến pháp cơ bản",
+            "Hệ thống chính trị"
+          ],
+          "forbiddenKeywords": []
+        },
+        "9": {
+          "stage": "THCS",
+          "topics": [
+            "Nền kinh tế thị trường",
+            "Quyền tài sản",
+            "Hợp đồng, giao dịch",
+            "Lao động, việc làm",
+            "Đóng góp cho cộng đồng"
+          ],
+          "forbiddenKeywords": []
+        },
+        "10": {
+          "stage": "THPT",
+          "topics": [
+            "Hiến pháp CHXHCN Việt Nam",
+            "Quyền và bổn phận công dân"
+          ],
+          "forbiddenKeywords": []
+        },
+        "11": {
+          "stage": "THPT",
+          "topics": [
+            "Kinh tế chính trị",
+            "Luật dân sự, luật hình sự"
+          ],
+          "forbiddenKeywords": []
+        },
+        "12": {
+          "stage": "THPT",
+          "topics": [
+            "Giáo dục kinh tế và pháp luật",
+            "Phát triển bền vững"
+          ],
+          "forbiddenKeywords": []
+        }
+      }
+    }
+  },
+  "validationRules": {
+    "description": "Quy tắc kiểm tra nội dung SKKN theo cấp lớp",
+    "checkByGrade": {
+      "instruction": "Nếu đề tài thuộc lớp X, kiểm tra output có chứa forbidden keywords của các lớp cao hơn không",
+      "example": "Toán lớp 9 → Cấm nguyên hàm, tích phân (của lớp 12)"
+    },
+    "checkBySubject": {
+      "instruction": "Kiểm tra chủ đề nội dung SKKN có nằm trong phạm vi kiến thức của môn học đó không",
+      "example": "Toán lớp 9 không nên có SKKN về đạo hàm (lớp 11), phương pháp quy nạp (lớp 11+)"
+    }
+  },
+  "examples": {
+    "invalidSKKN": {
+      "title": "Toán lớp 9 - Ứng dụng Nguyên hàm, tích phân",
+      "issue": "Nguyên hàm, tích phân là nội dung lớp 12, không phải lớp 9",
+      "solution": "Điều chỉnh đề tài sang lớp 12 hoặc thay đổi nội dung SKKN"
+    },
+    "validSKKN": {
+      "title": "Toán lớp 9 - Rèn luyện kỹ năng giải phương trình bậc hai",
+      "issue": "OK - Phương trình bậc hai là nội dung chuẩn lớp 9",
+      "solution": "Chấp nhận"
+    }
+  }
+}
