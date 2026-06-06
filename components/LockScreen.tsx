@@ -36,14 +36,14 @@ export const LockScreen: React.FC<LockScreenProps> = ({ onLogin }) => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-sky-50 to-white flex flex-col items-center justify-center p-4">
-      <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl border border-sky-100 overflow-hidden animate-fadeIn">
-        <div className="bg-sky-600 p-8 text-center">
+    <div className="min-h-screen bg-gradient-to-br from-teal-50 to-white flex flex-col items-center justify-center p-4">
+      <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl border border-teal-100 overflow-hidden animate-fadeIn">
+        <div className="bg-gradient-to-r from-teal-600 to-emerald-600 p-8 text-center">
           <div className="w-16 h-16 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center mx-auto mb-4">
             <Lock className="w-8 h-8 text-white" />
           </div>
-          <h1 className="text-2xl font-bold text-white">SKKN 2025</h1>
-          <p className="text-sky-100 text-sm mt-1">Đăng nhập để sử dụng ứng dụng</p>
+          <h1 className="text-xl font-bold text-white">TRỢ LÝ VIẾT KHOA HỌC KỸ THUẬT 2026</h1>
+          <p className="text-teal-100 text-sm mt-1">Đăng nhập để sử dụng ứng dụng</p>
         </div>
 
         <div className="p-8">
@@ -61,7 +61,7 @@ export const LockScreen: React.FC<LockScreenProps> = ({ onLogin }) => {
                   type="text"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
-                  className="block w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-sky-500 focus:border-sky-500 transition-colors text-base"
+                  className="block w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-teal-500 focus:border-teal-500 transition-colors text-base"
                   placeholder="Nhập tên đăng nhập"
                   autoFocus
                 />
@@ -81,7 +81,7 @@ export const LockScreen: React.FC<LockScreenProps> = ({ onLogin }) => {
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="block w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-sky-500 focus:border-sky-500 transition-colors text-base tracking-widest"
+                  className="block w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-teal-500 focus:border-teal-500 transition-colors text-base tracking-widest"
                   placeholder="••••••••"
                 />
               </div>
@@ -100,7 +100,7 @@ export const LockScreen: React.FC<LockScreenProps> = ({ onLogin }) => {
 
             <Button
               type="submit"
-              className="w-full py-3 text-lg shadow-sky-500/30"
+              className="w-full py-3 text-lg shadow-teal-500/30"
               isLoading={isLoading}
               disabled={!username || !password}
             >
@@ -111,7 +111,7 @@ export const LockScreen: React.FC<LockScreenProps> = ({ onLogin }) => {
 
         <div className="bg-gray-50 p-4 text-center border-t border-gray-100">
           <p className="text-xs text-gray-500">
-            Phiên bản: v8.0.3 (Education Enterprise)
+            Phiên bản: v9.0.0 (KHKT Research Edition)
           </p>
         </div>
       </div>
