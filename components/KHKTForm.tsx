@@ -42,6 +42,26 @@ const MAX_FILE_SIZE = 100 * 1024 * 1024;
 
 type ResearchSuggestionField = 'problem' | 'objectives' | 'hypothesis' | 'methods';
 
+interface SuggestedResearchIdea {
+  idea: string;
+  noveltyCreative: string;
+  feasibilityScalability: string;
+  timelinessPracticality: string;
+}
+
+function parseJsonArrayResponse<T>(rawText: string): T[] {
+  const codeBlockMatch = rawText.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
+  const candidate = (codeBlockMatch ? codeBlockMatch[1] : rawText).trim();
+  const arrayMatch = candidate.match(/\[[\s\S]*\]/);
+  const parsed = JSON.parse(arrayMatch ? arrayMatch[0] : candidate);
+
+  if (!Array.isArray(parsed)) {
+    throw new Error('AI không trả về danh sách JSON hợp lệ.');
+  }
+
+  return parsed as T[];
+}
+
 const RESEARCH_SUGGESTION_CONFIG: Record<ResearchSuggestionField, { label: string; instruction: string }> = {
   problem: {
     label: 'Vấn đề nghiên cứu / Lý do chọn đề tài',
@@ -81,6 +101,9 @@ export const KHKTForm: React.FC<Props> = ({ userInfo, onChange, onSubmit, onManu
   const [isGeneratingTitles, setIsGeneratingTitles] = useState(false);
   const [suggestedTitles, setSuggestedTitles] = useState<{ title: string; novelty: string; explanation: string }[]>([]);
   const [generationError, setGenerationError] = useState('');
+  const [isGeneratingIdeas, setIsGeneratingIdeas] = useState(false);
+  const [suggestedIdeas, setSuggestedIdeas] = useState<SuggestedResearchIdea[]>([]);
+  const [ideaGenerationError, setIdeaGenerationError] = useState('');
   const [showModalFieldDropdown, setShowModalFieldDropdown] = useState(false);
   const [modalSelectedGroup, setModalSelectedGroup] = useState<string | null>(null);
   const modalFieldDropdownRef = useRef<HTMLDivElement>(null);
@@ -99,6 +122,7 @@ export const KHKTForm: React.FC<Props> = ({ userInfo, onChange, onSubmit, onManu
     if (isOpenTitleModal) {
       setSelectedTitleField(userInfo.field || '');
       setGenerationError('');
+      setIdeaGenerationError('');
     }
   }, [isOpenTitleModal, userInfo.field]);
 
@@ -111,6 +135,83 @@ export const KHKTForm: React.FC<Props> = ({ userInfo, onChange, onSubmit, onManu
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, []);
+
+  const generateResearchIdeas = async () => {
+    if (!selectedTitleField) {
+      setIdeaGenerationError('Vui lòng chọn lĩnh vực nghiên cứu trước khi yêu cầu AI gợi ý ý tưởng.');
+      return;
+    }
+    if (!apiKey) {
+      setIdeaGenerationError('Vui lòng nhập Gemini API Key trong phần Cài đặt trước khi dùng AI gợi ý ý tưởng.');
+      return;
+    }
+
+    setIsGeneratingIdeas(true);
+    setIdeaGenerationError('');
+    setGenerationError('');
+    setSuggestedIdeas([]);
+    setSuggestedTitles([]);
+
+    try {
+      initializeGeminiChat(apiKey, selectedModel);
+
+      const currentYear = new Date().getFullYear();
+      const prompt = `Bạn là chuyên gia hướng dẫn nghiên cứu Khoa học Kỹ thuật (KHKT) cho học sinh THPT và hiểu điều kiện triển khai thực tế tại trường phổ thông Việt Nam.
+
+Giáo viên hiện CHƯA CÓ Ý TƯỞNG BAN ĐẦU. Hãy đề xuất 5 hướng nghiên cứu thuộc lĩnh vực: "${selectedTitleField}".
+
+Mỗi ý tưởng bắt buộc đáp ứng đồng thời các tiêu chí:
+1. TÍNH MỚI: Có điểm khác biệt cụ thể so với cách làm phổ biến; không tuyên bố "đầu tiên" hoặc "duy nhất" khi không có bằng chứng.
+2. TÍNH SÁNG TẠO: Kết hợp kiến thức, vật liệu, dữ liệu hoặc công nghệ theo một hướng giải quyết có giá trị.
+3. KHẢ NĂNG LÀM ĐƯỢC: Học sinh THPT có thể triển khai trong khoảng 3-6 tháng, kinh phí hợp lý, vật liệu/dữ liệu/công cụ có thể tiếp cận và có kết quả đo lường được.
+4. KHẢ NĂNG NHÂN RỘNG: Có thể áp dụng từ một lớp hoặc một trường sang nhiều lớp, nhiều trường hay địa phương khác; ưu tiên thiết kế mô-đun, chi phí hợp lý.
+5. TÍNH THỜI SỰ: Gắn với vấn đề đáng quan tâm trong năm ${currentYear} và những năm gần đây, phù hợp đúng lĩnh vực; không bịa xu hướng, số liệu hay chính sách.
+6. GẮN VỚI THỰC TIỄN: Xuất phát từ vấn đề thật ở trường học, gia đình hoặc địa phương và nêu rõ đối tượng được hưởng lợi.
+
+Đây là GỢI Ý HƯỚNG NGHIÊN CỨU, chưa phải tên đề tài hoàn chỉnh. Mỗi ý tưởng phải đủ cụ thể để giáo viên có thể dùng làm đầu vào tạo tên đề tài.
+
+Chỉ trả về một mảng JSON hợp lệ trong block \`\`\`json, đúng cấu trúc:
+[
+  {
+    "idea": "Mô tả ngắn gọn vấn đề, hướng giải quyết/sản phẩm và đối tượng hưởng lợi",
+    "noveltyCreative": "Điểm mới và yếu tố sáng tạo cụ thể",
+    "feasibilityScalability": "Cách làm ở quy mô THPT và hướng nhân rộng",
+    "timelinessPracticality": "Tính thời sự và giá trị thực tiễn"
+  }
+]
+
+Không viết lời chào hoặc nội dung ngoài JSON.`;
+
+      let fullText = '';
+      await sendSinglePromptStream(prompt, chunk => {
+        fullText += chunk;
+      });
+
+      const parsedIdeas = parseJsonArrayResponse<SuggestedResearchIdea>(fullText).filter(item =>
+        item &&
+        typeof item.idea === 'string' && item.idea.trim() &&
+        typeof item.noveltyCreative === 'string' && item.noveltyCreative.trim() &&
+        typeof item.feasibilityScalability === 'string' && item.feasibilityScalability.trim() &&
+        typeof item.timelinessPracticality === 'string' && item.timelinessPracticality.trim()
+      ).slice(0, 5);
+
+      if (parsedIdeas.length === 0) {
+        throw new Error('AI chưa trả về ý tưởng đủ thông tin. Vui lòng thử lại.');
+      }
+
+      setSuggestedIdeas(parsedIdeas);
+    } catch (err: any) {
+      console.error('Lỗi AI gợi ý ý tưởng:', err);
+      if (err instanceof Error && (err.message.startsWith('AI không') || err.message.startsWith('AI chưa'))) {
+        setIdeaGenerationError(err.message);
+      } else {
+        const errorInfo = getFriendlyErrorMessage(err);
+        setIdeaGenerationError(`${errorInfo.title}: ${errorInfo.message}`);
+      }
+    } finally {
+      setIsGeneratingIdeas(false);
+    }
+  };
 
   const generateTitles = async () => {
     if (!apiKey) {
@@ -143,6 +244,8 @@ Yêu cầu về đề tài gợi ý:
 3. Ý TƯỞNG / TỪ KHÓA BAN ĐẦU CỦA HỌC SINH: "${titleKeywords}"
 4. TÍNH MỚI & SÁNG TẠO: Mỗi đề tài cần chỉ ra rõ ràng "tính mới" đột phá hoặc hướng giải quyết sáng tạo hơn so với các phương pháp/thiết bị hiện tại để đảm bảo không bị trùng lắp hay đạo văn.
 5. PHÙ HỢP NĂNG LỰC: Phù hợp với năng lực học sinh THPT nhưng vẫn mang tính học thuật cao.
+6. KHẢ THI & CÓ THỂ NHÂN RỘNG: Có lộ trình thực hiện được trong điều kiện THPT và có khả năng mở rộng sang nhiều lớp, trường hoặc địa phương.
+7. THỜI SỰ & THỰC TIỄN: Giải quyết vấn đề đang được quan tâm, gắn với nhu cầu thật của trường học, gia đình hoặc địa phương.
 
 Bạn BẮT BUỘC phải trả về kết quả dưới dạng một mảng JSON hợp lệ nằm trong một block code markdown \`\`\`json ... \`\`\`. Ngoài block code JSON này, không viết thêm bất kỳ lời thoại nào khác.
 
@@ -696,7 +799,12 @@ Yêu cầu chung:
                         <button
                           key={f.id}
                           type="button"
-                          onClick={() => { setSelectedTitleField(f.name); setShowModalFieldDropdown(false); }}
+                          onClick={() => {
+                            setSelectedTitleField(f.name);
+                            setSuggestedIdeas([]);
+                            setIdeaGenerationError('');
+                            setShowModalFieldDropdown(false);
+                          }}
                           className={`w-full text-left px-3 py-2 text-sm hover:bg-teal-50 transition-colors ${selectedTitleField === f.name ? 'bg-teal-50 text-teal-700 font-medium' : 'text-gray-700'}`}
                         >
                           {f.name}
@@ -709,9 +817,24 @@ Yêu cầu chung:
 
               {/* Idea input */}
               <div className="space-y-1">
-                <label className="block text-sm font-semibold text-gray-900">
-                  Ý tưởng ban đầu / Từ khóa chính <span className="text-red-500">*</span>
-                </label>
+                <div className="flex items-center justify-between gap-3">
+                  <label className="block text-sm font-semibold text-gray-900">
+                    Ý tưởng ban đầu / Từ khóa chính <span className="text-red-500">*</span>
+                  </label>
+                  <button
+                    type="button"
+                    onClick={generateResearchIdeas}
+                    disabled={isGeneratingIdeas || isGeneratingTitles}
+                    className="shrink-0 text-xs font-semibold text-teal-700 hover:text-teal-900 flex items-center gap-1 bg-teal-50 hover:bg-teal-100 px-2.5 py-1.5 rounded-md transition-all border border-teal-200 hover:border-teal-300 shadow-sm disabled:opacity-60 disabled:cursor-not-allowed"
+                    aria-label="AI gợi ý ý tưởng nghiên cứu"
+                  >
+                    {isGeneratingIdeas ? (
+                      <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Đang gợi ý...</>
+                    ) : (
+                      <><Lightbulb className="w-3.5 h-3.5" /> AI gợi ý ý tưởng</>
+                    )}
+                  </button>
+                </div>
                 <textarea
                   value={titleKeywords}
                   onChange={e => setTitleKeywords(e.target.value)}
@@ -720,6 +843,45 @@ Yêu cầu chung:
                   rows={3}
                 />
               </div>
+
+              {ideaGenerationError && (
+                <div className="bg-red-50 border border-red-200 text-red-700 p-3.5 rounded-lg text-sm flex items-start gap-2" role="alert">
+                  <AlertTriangle className="w-5 h-5 shrink-0 text-red-500 mt-0.5" />
+                  <p className="font-medium">{ideaGenerationError}</p>
+                </div>
+              )}
+
+              {suggestedIdeas.length > 0 && (
+                <div className="space-y-3 rounded-xl border border-teal-200 bg-teal-50/40 p-4">
+                  <p className="text-sm font-bold text-teal-800 flex items-center gap-1.5">
+                    <Lightbulb size={16} /> {suggestedIdeas.length} ý tưởng AI đề xuất
+                  </p>
+                  <div className="space-y-3">
+                    {suggestedIdeas.map((item, idx) => (
+                      <div key={`${item.idea}-${idx}`} className="rounded-lg border border-teal-100 bg-white p-3 shadow-sm">
+                        <p className="text-sm font-bold text-gray-900">{idx + 1}. {item.idea}</p>
+                        <div className="mt-2 space-y-1.5 text-xs leading-relaxed">
+                          <p className="text-emerald-700"><span className="font-bold">✨ Mới & sáng tạo:</span> {item.noveltyCreative}</p>
+                          <p className="text-blue-700"><span className="font-bold">🛠️ Khả thi & nhân rộng:</span> {item.feasibilityScalability}</p>
+                          <p className="text-amber-700"><span className="font-bold">🌍 Thời sự & thực tiễn:</span> {item.timelinessPracticality}</p>
+                        </div>
+                        <div className="mt-3 flex justify-end">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setTitleKeywords(item.idea);
+                              setIdeaGenerationError('');
+                            }}
+                            className="inline-flex items-center gap-1 rounded-md bg-teal-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-teal-700"
+                          >
+                            <Check size={14} /> Dùng ý tưởng này
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {generationError && (
                 <div className="bg-red-50 border border-red-200 text-red-700 p-3.5 rounded-lg text-sm flex items-start gap-2">
@@ -732,7 +894,7 @@ Yêu cầu chung:
               <button
                 type="button"
                 onClick={generateTitles}
-                disabled={isGeneratingTitles || !titleKeywords.trim() || !selectedTitleField}
+                disabled={isGeneratingTitles || isGeneratingIdeas || !titleKeywords.trim() || !selectedTitleField}
                 className="w-full bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-700 hover:to-emerald-700 text-white font-bold py-3 rounded-lg shadow transition-all disabled:opacity-50 flex items-center justify-center gap-2"
               >
                 {isGeneratingTitles ? (
