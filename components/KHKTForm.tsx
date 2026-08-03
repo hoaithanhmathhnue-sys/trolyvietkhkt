@@ -47,7 +47,41 @@ interface SuggestedResearchIdea {
   noveltyCreative: string;
   feasibilityScalability: string;
   timelinessPracticality: string;
+  localFit: string;
 }
+
+interface IdeaLocalContext {
+  localSetting: string;
+  urgentProblem: string;
+  beneficiaries: string;
+  facilities: string;
+  equipment: string;
+  researchAccess: string;
+  supportNetwork: string;
+  resourceLimits: string;
+}
+
+const EMPTY_IDEA_LOCAL_CONTEXT: IdeaLocalContext = {
+  localSetting: '',
+  urgentProblem: '',
+  beneficiaries: '',
+  facilities: '',
+  equipment: '',
+  researchAccess: '',
+  supportNetwork: '',
+  resourceLimits: '',
+};
+
+const IDEA_LOCAL_CONTEXT_LABELS: Record<keyof IdeaLocalContext, string> = {
+  localSetting: 'Trường/địa phương và đặc điểm nổi bật',
+  urgentProblem: 'Vấn đề thực tế đang cần giải quyết',
+  beneficiaries: 'Đối tượng hoặc nhóm sẽ được hưởng lợi',
+  facilities: 'Cơ sở vật chất hiện có',
+  equipment: 'Trang thiết bị, phần mềm, vật liệu hiện có',
+  researchAccess: 'Dữ liệu, mẫu hoặc đối tượng khảo sát có thể tiếp cận',
+  supportNetwork: 'Nhân lực, chuyên môn hoặc đơn vị có thể phối hợp',
+  resourceLimits: 'Kinh phí, thời gian, an toàn và các giới hạn khác',
+};
 
 function parseJsonArrayResponse<T>(rawText: string): T[] {
   const codeBlockMatch = rawText.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
@@ -104,6 +138,8 @@ export const KHKTForm: React.FC<Props> = ({ userInfo, onChange, onSubmit, onManu
   const [isGeneratingIdeas, setIsGeneratingIdeas] = useState(false);
   const [suggestedIdeas, setSuggestedIdeas] = useState<SuggestedResearchIdea[]>([]);
   const [ideaGenerationError, setIdeaGenerationError] = useState('');
+  const [showIdeaLocalContext, setShowIdeaLocalContext] = useState(true);
+  const [ideaLocalContext, setIdeaLocalContext] = useState<IdeaLocalContext>(EMPTY_IDEA_LOCAL_CONTEXT);
   const [showModalFieldDropdown, setShowModalFieldDropdown] = useState(false);
   const [modalSelectedGroup, setModalSelectedGroup] = useState<string | null>(null);
   const modalFieldDropdownRef = useRef<HTMLDivElement>(null);
@@ -123,8 +159,12 @@ export const KHKTForm: React.FC<Props> = ({ userInfo, onChange, onSubmit, onManu
       setSelectedTitleField(userInfo.field || '');
       setGenerationError('');
       setIdeaGenerationError('');
+      const knownLocation = [userInfo.school, userInfo.location].filter(item => item?.trim()).join(', ');
+      if (knownLocation) {
+        setIdeaLocalContext(prev => prev.localSetting.trim() ? prev : { ...prev, localSetting: knownLocation });
+      }
     }
-  }, [isOpenTitleModal, userInfo.field]);
+  }, [isOpenTitleModal, userInfo.field, userInfo.school, userInfo.location]);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -135,6 +175,20 @@ export const KHKTForm: React.FC<Props> = ({ userInfo, onChange, onSubmit, onManu
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, []);
+
+  const updateIdeaLocalContext = (field: keyof IdeaLocalContext, value: string) => {
+    setIdeaLocalContext(prev => ({ ...prev, [field]: value }));
+  };
+
+  const formatIdeaLocalContext = () => {
+    const providedContext = (Object.entries(ideaLocalContext) as Array<[keyof IdeaLocalContext, string]>)
+      .filter(([, value]) => value.trim())
+      .map(([field, value]) => `- ${IDEA_LOCAL_CONTEXT_LABELS[field]}: ${value.trim()}`);
+
+    return providedContext.length > 0
+      ? providedContext.join('\n')
+      : '- Giáo viên chưa cung cấp thông tin bổ sung. Chỉ đề xuất phương án dùng nguồn lực phổ biến tại trường THPT và phải nêu rõ các giả định.';
+  };
 
   const generateResearchIdeas = async () => {
     if (!selectedTitleField) {
@@ -160,6 +214,9 @@ export const KHKTForm: React.FC<Props> = ({ userInfo, onChange, onSubmit, onManu
 
 Giáo viên hiện CHƯA CÓ Ý TƯỞNG BAN ĐẦU. Hãy đề xuất 5 hướng nghiên cứu thuộc lĩnh vực: "${selectedTitleField}".
 
+THÔNG TIN THỰC TẾ DO GIÁO VIÊN CUNG CẤP (các mục bỏ trống không được tự bịa):
+${formatIdeaLocalContext()}
+
 Mỗi ý tưởng bắt buộc đáp ứng đồng thời các tiêu chí:
 1. TÍNH MỚI: Có điểm khác biệt cụ thể so với cách làm phổ biến; không tuyên bố "đầu tiên" hoặc "duy nhất" khi không có bằng chứng.
 2. TÍNH SÁNG TẠO: Kết hợp kiến thức, vật liệu, dữ liệu hoặc công nghệ theo một hướng giải quyết có giá trị.
@@ -167,6 +224,7 @@ Mỗi ý tưởng bắt buộc đáp ứng đồng thời các tiêu chí:
 4. KHẢ NĂNG NHÂN RỘNG: Có thể áp dụng từ một lớp hoặc một trường sang nhiều lớp, nhiều trường hay địa phương khác; ưu tiên thiết kế mô-đun, chi phí hợp lý.
 5. TÍNH THỜI SỰ: Gắn với vấn đề đáng quan tâm trong năm ${currentYear} và những năm gần đây, phù hợp đúng lĩnh vực; không bịa xu hướng, số liệu hay chính sách.
 6. GẮN VỚI THỰC TIỄN: Xuất phát từ vấn đề thật ở trường học, gia đình hoặc địa phương và nêu rõ đối tượng được hưởng lợi.
+7. PHÙ HỢP ĐẶC THÙ ĐỊA PHƯƠNG/TRƯỜNG: Ưu tiên tận dụng cơ sở vật chất, thiết bị, dữ liệu, nhân lực và điều kiện đã được giáo viên cung cấp. Nếu thông tin còn thiếu, nêu giả định thận trọng, không tự bịa nguồn lực.
 
 Đây là GỢI Ý HƯỚNG NGHIÊN CỨU, chưa phải tên đề tài hoàn chỉnh. Mỗi ý tưởng phải đủ cụ thể để giáo viên có thể dùng làm đầu vào tạo tên đề tài.
 
@@ -176,7 +234,8 @@ Chỉ trả về một mảng JSON hợp lệ trong block \`\`\`json, đúng c�
     "idea": "Mô tả ngắn gọn vấn đề, hướng giải quyết/sản phẩm và đối tượng hưởng lợi",
     "noveltyCreative": "Điểm mới và yếu tố sáng tạo cụ thể",
     "feasibilityScalability": "Cách làm ở quy mô THPT và hướng nhân rộng",
-    "timelinessPracticality": "Tính thời sự và giá trị thực tiễn"
+    "timelinessPracticality": "Tính thời sự và giá trị thực tiễn",
+    "localFit": "Cách ý tưởng tận dụng điều kiện cụ thể của trường/địa phương; nếu thiếu thông tin thì nêu giả định cần xác minh"
   }
 ]
 
@@ -192,7 +251,8 @@ Không viết lời chào hoặc nội dung ngoài JSON.`;
         typeof item.idea === 'string' && item.idea.trim() &&
         typeof item.noveltyCreative === 'string' && item.noveltyCreative.trim() &&
         typeof item.feasibilityScalability === 'string' && item.feasibilityScalability.trim() &&
-        typeof item.timelinessPracticality === 'string' && item.timelinessPracticality.trim()
+        typeof item.timelinessPracticality === 'string' && item.timelinessPracticality.trim() &&
+        typeof item.localFit === 'string' && item.localFit.trim()
       ).slice(0, 5);
 
       if (parsedIdeas.length === 0) {
@@ -242,10 +302,12 @@ Yêu cầu về đề tài gợi ý:
 1. ĐÚNG CẤU TRÚC KHKT: Tên đề tài bắt đầu bằng các động từ khoa học như "Nghiên cứu...", "Thiết kế...", "Xây dựng...", "Chế tạo...", "Đánh giá...", "Phân tích...", v.v. và chỉ rõ đối tượng, phạm vi nghiên cứu rõ ràng.
 2. LĨNH VỰC NGHIÊN CỨU: ${selectedTitleField}
 3. Ý TƯỞNG / TỪ KHÓA BAN ĐẦU CỦA HỌC SINH: "${titleKeywords}"
-4. TÍNH MỚI & SÁNG TẠO: Mỗi đề tài cần chỉ ra rõ ràng "tính mới" đột phá hoặc hướng giải quyết sáng tạo hơn so với các phương pháp/thiết bị hiện tại để đảm bảo không bị trùng lắp hay đạo văn.
-5. PHÙ HỢP NĂNG LỰC: Phù hợp với năng lực học sinh THPT nhưng vẫn mang tính học thuật cao.
-6. KHẢ THI & CÓ THỂ NHÂN RỘNG: Có lộ trình thực hiện được trong điều kiện THPT và có khả năng mở rộng sang nhiều lớp, trường hoặc địa phương.
-7. THỜI SỰ & THỰC TIỄN: Giải quyết vấn đề đang được quan tâm, gắn với nhu cầu thật của trường học, gia đình hoặc địa phương.
+4. BỐI CẢNH THỰC TẾ CỦA TRƯỜNG/ĐỊA PHƯƠNG:
+${formatIdeaLocalContext()}
+5. TÍNH MỚI & SÁNG TẠO: Mỗi đề tài cần chỉ ra rõ ràng "tính mới" đột phá hoặc hướng giải quyết sáng tạo hơn so với các phương pháp/thiết bị hiện tại để đảm bảo không bị trùng lắp hay đạo văn.
+6. PHÙ HỢP NĂNG LỰC: Phù hợp với năng lực học sinh THPT nhưng vẫn mang tính học thuật cao.
+7. KHẢ THI & CÓ THỂ NHÂN RỘNG: Có lộ trình thực hiện được trong điều kiện THPT và có khả năng mở rộng sang nhiều lớp, trường hoặc địa phương.
+8. THỜI SỰ & THỰC TIỄN: Giải quyết vấn đề đang được quan tâm, gắn với nhu cầu thật của trường học, gia đình hoặc địa phương.
 
 Bạn BẮT BUỘC phải trả về kết quả dưới dạng một mảng JSON hợp lệ nằm trong một block code markdown \`\`\`json ... \`\`\`. Ngoài block code JSON này, không viết thêm bất kỳ lời thoại nào khác.
 
@@ -815,6 +877,117 @@ Yêu cầu chung:
                 </div>
               </div>
 
+              {/* Optional local context questions */}
+              <div className="overflow-hidden rounded-xl border border-blue-200 bg-blue-50/40">
+                <button
+                  type="button"
+                  onClick={() => setShowIdeaLocalContext(prev => !prev)}
+                  className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left hover:bg-blue-50 transition-colors"
+                  aria-expanded={showIdeaLocalContext}
+                >
+                  <div>
+                    <p className="text-sm font-bold text-blue-900">
+                      Thông tin thực tế tại trường/địa phương
+                      <span className="ml-2 rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-semibold text-blue-700">Không bắt buộc</span>
+                    </p>
+                    <p className="mt-0.5 text-xs text-blue-700">Trả lời được mục nào, AI sẽ bám sát điều kiện thực tế ở mục đó.</p>
+                  </div>
+                  <ChevronDown size={18} className={`shrink-0 text-blue-600 transition-transform ${showIdeaLocalContext ? 'rotate-180' : ''}`} />
+                </button>
+
+                {showIdeaLocalContext && (
+                  <div className="grid grid-cols-1 gap-3 border-t border-blue-100 bg-white/80 p-4 md:grid-cols-2">
+                    <label className="space-y-1 md:col-span-2">
+                      <span className="block text-xs font-semibold text-gray-800">Trường/địa phương dự kiến triển khai có đặc điểm gì nổi bật?</span>
+                      <textarea
+                        value={ideaLocalContext.localSetting}
+                        onChange={e => updateIdeaLocalContext('localSetting', e.target.value)}
+                        rows={2}
+                        className="w-full rounded-lg border border-gray-300 bg-white p-2.5 text-sm text-gray-900 focus:border-blue-500 focus:ring-blue-500"
+                        placeholder="VD: Trường THPT ở khu vực ven biển; học sinh chủ yếu thuộc các xã nông nghiệp..."
+                      />
+                    </label>
+
+                    <label className="space-y-1 md:col-span-2">
+                      <span className="block text-xs font-semibold text-gray-800">Vấn đề thực tế nào đang cần được giải quyết nhất?</span>
+                      <textarea
+                        value={ideaLocalContext.urgentProblem}
+                        onChange={e => updateIdeaLocalContext('urgentProblem', e.target.value)}
+                        rows={2}
+                        className="w-full rounded-lg border border-gray-300 bg-white p-2.5 text-sm text-gray-900 focus:border-blue-500 focus:ring-blue-500"
+                        placeholder="VD: Rác thải nhựa trong trường, ngập úng, chất lượng nước, an toàn học đường..."
+                      />
+                    </label>
+
+                    <label className="space-y-1">
+                      <span className="block text-xs font-semibold text-gray-800">Ai sẽ sử dụng hoặc được hưởng lợi?</span>
+                      <textarea
+                        value={ideaLocalContext.beneficiaries}
+                        onChange={e => updateIdeaLocalContext('beneficiaries', e.target.value)}
+                        rows={2}
+                        className="w-full rounded-lg border border-gray-300 bg-white p-2.5 text-sm text-gray-900 focus:border-blue-500 focus:ring-blue-500"
+                        placeholder="VD: Học sinh lớp 10, người cao tuổi, hộ trồng rau..."
+                      />
+                    </label>
+
+                    <label className="space-y-1">
+                      <span className="block text-xs font-semibold text-gray-800">Có thể sử dụng cơ sở vật chất nào?</span>
+                      <textarea
+                        value={ideaLocalContext.facilities}
+                        onChange={e => updateIdeaLocalContext('facilities', e.target.value)}
+                        rows={2}
+                        className="w-full rounded-lg border border-gray-300 bg-white p-2.5 text-sm text-gray-900 focus:border-blue-500 focus:ring-blue-500"
+                        placeholder="VD: Phòng thí nghiệm, phòng máy, thư viện, vườn trường..."
+                      />
+                    </label>
+
+                    <label className="space-y-1">
+                      <span className="block text-xs font-semibold text-gray-800">Hiện có thiết bị, phần mềm hoặc vật liệu gì?</span>
+                      <textarea
+                        value={ideaLocalContext.equipment}
+                        onChange={e => updateIdeaLocalContext('equipment', e.target.value)}
+                        rows={2}
+                        className="w-full rounded-lg border border-gray-300 bg-white p-2.5 text-sm text-gray-900 focus:border-blue-500 focus:ring-blue-500"
+                        placeholder="VD: Máy tính, Arduino, cảm biến, kính hiển vi, hóa chất cơ bản..."
+                      />
+                    </label>
+
+                    <label className="space-y-1">
+                      <span className="block text-xs font-semibold text-gray-800">Có thể tiếp cận dữ liệu, mẫu hoặc người tham gia nào?</span>
+                      <textarea
+                        value={ideaLocalContext.researchAccess}
+                        onChange={e => updateIdeaLocalContext('researchAccess', e.target.value)}
+                        rows={2}
+                        className="w-full rounded-lg border border-gray-300 bg-white p-2.5 text-sm text-gray-900 focus:border-blue-500 focus:ring-blue-500"
+                        placeholder="VD: Mẫu nước ao, dữ liệu thời tiết, 200 học sinh tự nguyện khảo sát..."
+                      />
+                    </label>
+
+                    <label className="space-y-1">
+                      <span className="block text-xs font-semibold text-gray-800">Ai hoặc đơn vị nào có thể hỗ trợ chuyên môn?</span>
+                      <textarea
+                        value={ideaLocalContext.supportNetwork}
+                        onChange={e => updateIdeaLocalContext('supportNetwork', e.target.value)}
+                        rows={2}
+                        className="w-full rounded-lg border border-gray-300 bg-white p-2.5 text-sm text-gray-900 focus:border-blue-500 focus:ring-blue-500"
+                        placeholder="VD: Giáo viên Tin học, trạm y tế, hợp tác xã, doanh nghiệp địa phương..."
+                      />
+                    </label>
+
+                    <label className="space-y-1 md:col-span-2">
+                      <span className="block text-xs font-semibold text-gray-800">Giới hạn về kinh phí, thời gian, an toàn hoặc điều kiện khác?</span>
+                      <textarea
+                        value={ideaLocalContext.resourceLimits}
+                        onChange={e => updateIdeaLocalContext('resourceLimits', e.target.value)}
+                        rows={2}
+                        className="w-full rounded-lg border border-gray-300 bg-white p-2.5 text-sm text-gray-900 focus:border-blue-500 focus:ring-blue-500"
+                        placeholder="VD: Kinh phí dưới 3 triệu đồng, hoàn thành trong 4 tháng, không dùng hóa chất độc hại..."
+                      />
+                    </label>
+                  </div>
+                )}
+              </div>
+
               {/* Idea input */}
               <div className="space-y-1">
                 <div className="flex items-center justify-between gap-3">
@@ -864,6 +1037,7 @@ Yêu cầu chung:
                           <p className="text-emerald-700"><span className="font-bold">✨ Mới & sáng tạo:</span> {item.noveltyCreative}</p>
                           <p className="text-blue-700"><span className="font-bold">🛠️ Khả thi & nhân rộng:</span> {item.feasibilityScalability}</p>
                           <p className="text-amber-700"><span className="font-bold">🌍 Thời sự & thực tiễn:</span> {item.timelinessPracticality}</p>
+                          <p className="text-violet-700"><span className="font-bold">🏫 Phù hợp trường/địa phương:</span> {item.localFit}</p>
                         </div>
                         <div className="mt-3 flex justify-end">
                           <button
