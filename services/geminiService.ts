@@ -1,22 +1,46 @@
-
 import { GoogleGenAI, Chat } from "@google/genai";
 import { SYSTEM_INSTRUCTION, FALLBACK_MODELS } from "../constants";
 import { TitleAnalysisResult } from '../types';
+
+export const getGeminiGenerationConfig = (model: string, extraConfig: any = {}) => {
+  const isNewGeminiModel = model.startsWith('gemini-3');
+  const config = { ...extraConfig };
+  
+  if (!isNewGeminiModel) {
+    config.temperature = 0.7;
+    config.topK = 64;
+    config.topP = 0.95;
+  }
+  return config;
+};
 
 // Hàm phân tích và trả về thông báo lỗi thân thiện
 export const parseApiError = (error: any): string => {
   const errorMessage = error?.message || error?.toString() || '';
   const errorString = JSON.stringify(error);
 
-  // Kiểm tra lỗi quota exceeded (429)
+  if (errorString.includes('400') || errorMessage.includes('INVALID_ARGUMENT')) {
+    return 'INVALID_ARGUMENT';
+  }
+  if (errorString.includes('404') || errorMessage.includes('NOT_FOUND')) {
+    return 'NOT_FOUND';
+  }
+  if (errorString.includes('500') || errorString.includes('503') || errorString.includes('504') || 
+      errorMessage.includes('INTERNAL') || errorMessage.includes('UNAVAILABLE') || errorMessage.includes('DEADLINE_EXCEEDED')) {
+    return 'SERVER_ERROR';
+  }
+
+  // Kiểm tra lỗi quota exceeded (429) / rate limit / overloaded
   if (errorString.includes('429') ||
     errorMessage.includes('quota') ||
     errorMessage.includes('RESOURCE_EXHAUSTED') ||
-    errorMessage.includes('exceeded')) {
+    errorMessage.includes('exceeded') ||
+    errorMessage.includes('overloaded') ||
+    errorMessage.includes('high demand') ||
+    errorMessage.includes('temporarily unavailable')) {
     return 'QUOTA_EXCEEDED';
   }
 
-  // Kiểm tra lỗi rate limit
   if (errorMessage.includes('rate') || errorMessage.includes('limit')) {
     return 'RATE_LIMIT';
   }
@@ -25,7 +49,8 @@ export const parseApiError = (error: any): string => {
   if (errorMessage.includes('API_KEY_INVALID') ||
     errorMessage.includes('401') ||
     errorMessage.includes('unauthorized') ||
-    errorMessage.includes('PERMISSION_DENIED')) {
+    errorMessage.includes('PERMISSION_DENIED') ||
+    errorMessage.includes('403')) {
     return 'INVALID_API_KEY';
   }
 
@@ -91,6 +116,30 @@ export const getFriendlyErrorMessage = (error: any): { type: string; title: stri
         ]
       };
 
+    case 'INVALID_ARGUMENT':
+      return {
+        type: 'invalid_argument',
+        title: '❌ Lỗi tham số (400)',
+        message: 'Có lỗi trong cấu hình tham số gửi đến AI. Vui lòng kiểm tra lại.',
+        suggestions: ['🔄 Thử làm mới trang và thực hiện lại']
+      };
+
+    case 'NOT_FOUND':
+      return {
+        type: 'not_found',
+        title: '❌ Không tìm thấy model (404)',
+        message: 'Model AI đang được gọi không tồn tại hoặc đã bị khóa.',
+        suggestions: ['🔄 Đổi sang model khác trong phần Cài đặt']
+      };
+
+    case 'SERVER_ERROR':
+      return {
+        type: 'server_error',
+        title: '🌐 Lỗi máy chủ (500/503)',
+        message: 'Máy chủ Google AI đang gặp sự cố. Hệ thống sẽ tự động thử model khác.',
+        suggestions: ['⏰ Đợi một lúc rồi thử lại']
+      };
+
     default:
       return {
         type: 'unknown',
@@ -134,15 +183,12 @@ const createChatSession = (model: string) => {
 
   return ai.chats.create({
     model: model,
-    config: {
+    config: getGeminiGenerationConfig(model, {
       systemInstruction: SYSTEM_INSTRUCTION,
-      temperature: 0.7,
-      topK: 64,
-      topP: 0.95,
       maxOutputTokens: 65536,
       thinkingConfig: { thinkingBudget: 2048 },
       tools: [{ googleSearch: {} }]
-    },
+    }),
     history: history
   });
 };
@@ -193,15 +239,12 @@ export const sendMessageStream = async (message: string, onChunk: (text: string)
       const ai = new GoogleGenAI({ apiKey: currentApiKey });
       chatSession = ai.chats.create({
         model: model,
-        config: {
+        config: getGeminiGenerationConfig(model, {
           systemInstruction: SYSTEM_INSTRUCTION,
-          temperature: 0.7,
-          topK: 64,
-          topP: 0.95,
           maxOutputTokens: 65536,
           thinkingConfig: { thinkingBudget: 2048 },
           tools: [{ googleSearch: {} }]
-        },
+        }),
         history: history
       });
 
@@ -227,6 +270,12 @@ export const sendMessageStream = async (message: string, onChunk: (text: string)
       lastError = error;
 
       const errorType = parseApiError(error);
+      
+      if (errorType !== 'QUOTA_EXCEEDED' && errorType !== 'RATE_LIMIT' && errorType !== 'NOT_FOUND' && errorType !== 'SERVER_ERROR') {
+         console.error(`🛑 Lỗi nghiêm trọng (${errorType}), không fallback. Dừng ngay lập tức.`);
+         throw error;
+      }
+      
       console.log(`⏭️ Lỗi ${errorType}, thử model tiếp theo...`);
 
       // Tiếp tục thử model tiếp theo
@@ -261,13 +310,10 @@ export const sendSinglePromptStream = async (message: string, onChunk: (text: st
       const ai = new GoogleGenAI({ apiKey: currentApiKey });
       const response = await ai.models.generateContentStream({
         model: model,
-        config: {
+        config: getGeminiGenerationConfig(model, {
           systemInstruction: SYSTEM_INSTRUCTION,
-          temperature: 0.7,
-          topK: 64,
-          topP: 0.95,
           maxOutputTokens: 65536,
-        },
+        }),
         contents: [{ role: 'user', parts: [{ text: message }] }]
       });
 
@@ -286,6 +332,12 @@ export const sendSinglePromptStream = async (message: string, onChunk: (text: st
     } catch (error: any) {
       console.error(`❌ [SinglePrompt] Model ${model} thất bại:`, error.message || error);
       lastError = error;
+      
+      const errorType = parseApiError(error);
+      if (errorType !== 'QUOTA_EXCEEDED' && errorType !== 'RATE_LIMIT' && errorType !== 'NOT_FOUND' && errorType !== 'SERVER_ERROR') {
+         console.error(`🛑 [SinglePrompt] Lỗi nghiêm trọng (${errorType}), không fallback. Dừng ngay lập tức.`);
+         throw error;
+      }
       continue;
     }
   }

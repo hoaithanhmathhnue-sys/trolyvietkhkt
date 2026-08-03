@@ -59,8 +59,9 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ isOpen, onSave, onClos
             return;
         }
 
-        if (!keyToSave.startsWith('AIza')) {
-            setError('API Key không hợp lệ. Key phải bắt đầu bằng "AIza..."');
+        const keyRegex = /^(?:AIzaSy|AQ)\S{8,}$/;
+        if (!keyRegex.test(keyToSave)) {
+            setError('API Key không hợp lệ. Key phải bắt đầu bằng "AIzaSy" hoặc "AQ" và đúng định dạng.');
             return;
         }
 
