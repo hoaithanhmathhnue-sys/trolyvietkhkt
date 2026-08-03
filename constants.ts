@@ -14,33 +14,68 @@ export const FALLBACK_MODELS = [
 
 export const MODEL_DISPLAY_ORDER = [
    'gemini-3.6-flash',
+   'gemini-3.1-pro-preview',
    'gemini-3.5-flash',
    'gemini-3.5-flash-lite',
    'gemini-3.1-flash-lite',
-   'gemini-2.5-flash'
+   'gemini-2.5-flash',
+   'gemini-2.5-pro'
 ];
 
-export const MODEL_INFO: Record<string, { name: string; description: string; isDefault?: boolean }> = {
+export interface ModelInfo {
+   name: string;
+   description: string;
+   isDefault?: boolean;
+   access?: 'free-and-paid' | 'paid-only';
+   status?: 'stable' | 'preview' | 'retiring';
+   priceNote?: string;
+}
+
+export const MODEL_INFO: Record<string, ModelInfo> = {
    'gemini-3.6-flash': {
       name: 'Gemini 3.6 Flash',
       description: 'Mạnh mẽ trong logic lập trình, lập luận đa bước (Model mặc định)',
-      isDefault: true
+      isDefault: true,
+      access: 'free-and-paid',
+      status: 'stable'
+   },
+   'gemini-3.1-pro-preview': {
+      name: 'Gemini 3.1 Pro Preview',
+      description: 'Suy luận sâu cho lập đề cương, viết báo cáo dài và phản biện đề tài KHKT',
+      access: 'paid-only',
+      status: 'preview',
+      priceNote: 'Chỉ dùng được khi dự án Google AI đã bật thanh toán; giá Standard từ 2 USD input và 12 USD output cho mỗi 1 triệu token.'
    },
    'gemini-3.5-flash': {
       name: 'Gemini 3.5 Flash',
-      description: 'Cân bằng giữa hiệu năng và tốc độ'
+      description: 'Cân bằng giữa hiệu năng và tốc độ',
+      access: 'free-and-paid',
+      status: 'stable'
    },
    'gemini-3.5-flash-lite': {
       name: 'Gemini 3.5 Flash Lite',
-      description: 'Nhanh nhất, rẻ nhất cho tác vụ thông thường'
+      description: 'Nhanh nhất, rẻ nhất cho tác vụ thông thường',
+      access: 'free-and-paid',
+      status: 'stable'
    },
    'gemini-3.1-flash-lite': {
       name: 'Gemini 3.1 Flash Lite',
-      description: 'Hiệu quả cho các tác vụ cần tốc độ'
+      description: 'Hiệu quả cho các tác vụ cần tốc độ',
+      access: 'free-and-paid',
+      status: 'stable'
    },
    'gemini-2.5-flash': {
       name: 'Gemini 2.5 Flash',
-      description: 'Chat, tốc độ nhanh, ổn định'
+      description: 'Chat nhanh, tương thích ngược; Google dự kiến ngừng ngày 16/10/2026',
+      access: 'free-and-paid',
+      status: 'retiring'
+   },
+   'gemini-2.5-pro': {
+      name: 'Gemini 2.5 Pro',
+      description: 'Suy luận phức tạp và xử lý tài liệu dài; chỉ giữ để tương thích tạm thời',
+      access: 'free-and-paid',
+      status: 'retiring',
+      priceNote: 'Có Paid Tier; Google dự kiến ngừng model này ngày 16/10/2026. Nên ưu tiên Gemini 3.1 Pro Preview cho tác vụ Pro mới.'
    }
 };
 

@@ -19,7 +19,7 @@ const getEnvApiKeys = (): string[] => {
 
 const ModelIcon: React.FC<{ modelId: string }> = ({ modelId }) => {
     if (modelId.includes('3-flash')) return <Zap className="w-5 h-5" />;
-    if (modelId.includes('3-pro')) return <Sparkles className="w-5 h-5" />;
+    if (modelId.includes('-pro')) return <Sparkles className="w-5 h-5" />;
     return <Cpu className="w-5 h-5" />;
 };
 
@@ -31,6 +31,7 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ isOpen, onSave, onClos
     // Lấy danh sách key từ env (chỉ tính 1 lần)
     const envKeys = useMemo(() => getEnvApiKeys(), []);
     const hasEnvKeys = envKeys.length > 0;
+    const selectedModelInfo = MODEL_INFO[selectedModel];
 
     // Load từ localStorage khi modal mở
     useEffect(() => {
@@ -133,6 +134,21 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ isOpen, onSave, onClos
                                                         Default
                                                     </span>
                                                 )}
+                                                {info?.access === 'paid-only' && (
+                                                    <span className="px-2 py-0.5 text-xs font-medium bg-amber-100 text-amber-800 rounded-full">
+                                                        Trả phí
+                                                    </span>
+                                                )}
+                                                {info?.status === 'preview' && (
+                                                    <span className="px-2 py-0.5 text-xs font-medium bg-violet-100 text-violet-700 rounded-full">
+                                                        Preview
+                                                    </span>
+                                                )}
+                                                {info?.status === 'retiring' && (
+                                                    <span className="px-2 py-0.5 text-xs font-medium bg-red-100 text-red-700 rounded-full">
+                                                        Sắp ngừng
+                                                    </span>
+                                                )}
                                             </div>
                                             <p className="text-xs text-gray-500 mt-0.5">
                                                 {info?.description || ''}
@@ -150,8 +166,17 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ isOpen, onSave, onClos
                             })}
                         </div>
                         <p className="text-xs text-gray-500 mt-2 italic">
-                            💡 Nếu model đang chọn bị lỗi/quá tải, hệ thống sẽ tự động thử các model khác theo thứ tự.
+                            💡 Model Pro chỉ được gọi khi bạn chủ động chọn. Nếu model đang chọn bị lỗi/quá tải, hệ thống sẽ thử chuỗi model phổ thông.
                         </p>
+                        {selectedModelInfo?.priceNote && (
+                            <div className={`mt-3 p-3 rounded-lg border text-sm ${selectedModelInfo.status === 'retiring'
+                                ? 'bg-red-50 border-red-200 text-red-800'
+                                : 'bg-amber-50 border-amber-200 text-amber-800'
+                                }`}>
+                                <strong>{selectedModelInfo.access === 'paid-only' ? 'Lưu ý chi phí:' : 'Lưu ý model:'}</strong>{' '}
+                                {selectedModelInfo.priceNote}
+                            </div>
+                        )}
                     </div>
 
                     {/* API Key Input */}

@@ -195,14 +195,12 @@ const createChatSession = (model: string) => {
 
 // Sắp xếp models với model được chọn đầu tiên
 const getOrderedModels = (): string[] => {
-  if (!currentSelectedModel || !FALLBACK_MODELS.includes(currentSelectedModel)) {
-    return FALLBACK_MODELS;
-  }
-
-  // Đưa model được chọn lên đầu, giữ nguyên thứ tự các model còn lại
-  const orderedModels = [currentSelectedModel];
+  // Model người dùng chủ động chọn luôn được thử trước, kể cả model Pro/Preview
+  // không nằm trong chuỗi fallback mặc định. Chuỗi fallback chỉ gồm các model
+  // production phổ thông để tránh tự động phát sinh chi phí ngoài ý muốn.
+  const orderedModels: string[] = currentSelectedModel ? [currentSelectedModel] : [];
   for (const model of FALLBACK_MODELS) {
-    if (model !== currentSelectedModel) {
+    if (!orderedModels.includes(model)) {
       orderedModels.push(model);
     }
   }
