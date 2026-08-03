@@ -484,38 +484,56 @@ ${userInfo.specialRequirements ? `📝 YÊU CẦU ĐẶC BIỆT: ${userInfo.spec
 CẤU TRÚC DÀN Ý ĐỀ TÀI KHKT (BẮT BUỘC):
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-📋 PHẦN MỞ ĐẦU
+📋 PHẦN I. MỞ ĐẦU (TỔNG QUAN)
    1. Lý do chọn đề tài
-   2. Câu hỏi nghiên cứu
-   3. Giả thuyết khoa học
-   4. Mục đích nghiên cứu
-   5. Đối tượng và phạm vi nghiên cứu
-   6. Phương pháp nghiên cứu
+   2. Mục tiêu nghiên cứu
+   3. Đối tượng nghiên cứu
+   4. Phạm vi nghiên cứu (không gian, thời gian, đối tượng)
+   5. Câu hỏi nghiên cứu
+   6. Giả thuyết khoa học
    7. Ý nghĩa khoa học và thực tiễn
+   8. Phương pháp nghiên cứu
+   9. Tính mới (tính sáng tạo) của đề tài
 
-📋 CHƯƠNG 1: TỔNG QUAN TÀI LIỆU
-   1.1. Cơ sở lý thuyết
-   1.2. Tình hình nghiên cứu trong và ngoài nước
-   1.3. Các khái niệm cơ bản
+📋 PHẦN II. NỘI DUNG NGHIÊN CỨU
 
-📋 CHƯƠNG 2: ĐỐI TƯỢNG VÀ PHƯƠNG PHÁP NGHIÊN CỨU
-   2.1. Đối tượng nghiên cứu
-   2.2. Phương pháp nghiên cứu cụ thể
-   2.3. Thiết kế thí nghiệm / Quy trình
-   2.4. Công cụ và phương tiện
-   2.5. Phương pháp xử lý số liệu
+📋 CHƯƠNG 1: CƠ SỞ LÝ LUẬN
+   1.1. Khái niệm
+   1.2. Kiến thức nền
+   1.3. Các nghiên cứu liên quan
+   1.4. Cơ sở khoa học
 
-📋 CHƯƠNG 3: KẾT QUẢ NGHIÊN CỨU VÀ THẢO LUẬN
-   3.1. Kết quả nghiên cứu (bảng, biểu đồ)
-   3.2. Phân tích và thảo luận
-   3.3. Sản phẩm nghiên cứu (nếu có)
+📋 CHƯƠNG 2: THỰC TRẠNG
+   2.1. Khảo sát
+   2.2. Thu thập dữ liệu
+   2.3. Phân tích số liệu
+   2.4. Đánh giá hiện trạng
 
-📋 CHƯƠNG 4: KẾT LUẬN VÀ KIẾN NGHỊ
-   4.1. Kết luận
-   4.2. Kiến nghị
-   4.3. Hướng phát triển
+📋 CHƯƠNG 3: THIẾT KẾ GIẢI PHÁP / SẢN PHẨM
+   3.1. Ý tưởng
+   3.2. Thiết kế
+   3.3. Quy trình
+   3.4. Nguyên lý hoạt động
+   3.5. Công nghệ sử dụng
+   3.6. Hình ảnh mô hình
 
-📋 PHỤ LỤC: Tài liệu tham khảo, Phiếu khảo sát, Số liệu thô
+📋 CHƯƠNG 4: THỰC NGHIỆM VÀ ĐÁNH GIÁ
+   4.1. Cách triển khai
+   4.2. Đối tượng thử nghiệm
+   4.3. Kết quả trước - sau
+   4.4. Biểu đồ và phân tích
+   4.5. Đánh giá hiệu quả
+
+📋 PHẦN III. KẾT LUẬN
+   1. Kết luận
+   2. Đóng góp của đề tài
+   3. Hạn chế
+   4. Hướng phát triển
+   5. Kiến nghị
+
+📋 PHỤ LỤC: Phiếu khảo sát, bảng số liệu, hình ảnh, nhật ký nghiên cứu, mã nguồn/link/QR và tài liệu minh chứng
+
+📋 TÀI LIỆU THAM KHẢO: Thống nhất theo chuẩn APA hoặc IEEE
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 YÊU CẦU DÀN Ý:
@@ -626,14 +644,16 @@ Hãy DÙNG CHÍNH XÁC NỘI DUNG NÀY:
 ${state.fullDocument}
 --- KẾT THÚC DÀN Ý CHÍNH THỨC ---
 
-NHIỆM VỤ: Viết chi tiết PHẦN MỞ ĐẦU gồm:
-1. Lý do chọn đề tài (tại sao vấn đề này quan trọng?)
-2. Câu hỏi nghiên cứu
-3. Giả thuyết khoa học: "${userInfo.hypothesis}"
-4. Mục đích nghiên cứu: "${userInfo.objectives}"
-5. Đối tượng và phạm vi nghiên cứu
-6. Phương pháp nghiên cứu: ${userInfo.methods}
+NHIỆM VỤ: Viết chi tiết PHẦN I. MỞ ĐẦU (Tổng quan) gồm:
+1. Lý do chọn đề tài
+2. Mục tiêu nghiên cứu: "${userInfo.objectives}"
+3. Đối tượng nghiên cứu: ${userInfo.researchSubjects || 'Chưa xác định'}
+4. Phạm vi nghiên cứu (Thời gian: ${userInfo.timeframe || 'Năm học hiện tại'}, Không gian, Đối tượng)
+5. Câu hỏi nghiên cứu
+6. Giả thuyết khoa học: "${userInfo.hypothesis}"
 7. Ý nghĩa khoa học và thực tiễn
+8. Phương pháp nghiên cứu: ${userInfo.methods}
+9. Tính mới (tính sáng tạo) của đề tài
 
 ⚠️ THÔNG TIN ĐỀ TÀI:
 - Tên đề tài: ${userInfo.projectTitle}
@@ -643,7 +663,7 @@ NHIỆM VỤ: Viết chi tiết PHẦN MỞ ĐẦU gồm:
 - GVHD: ${userInfo.advisor}
 
 ${getPageLimitPrompt()}
-${getSectionPagePrompt('Phần Mở đầu', 'intro')}
+${getSectionPagePrompt('Phần I. Mở đầu', 'intro')}
 
 FORMAT: Xuống dòng sau mỗi câu. Tách đoạn rõ ràng. Ngôn ngữ khoa học.`;
 
@@ -652,110 +672,93 @@ FORMAT: Xuống dòng sau mỗi câu. Tách đoạn rõ ràng. Ngôn ngữ khoa 
       const nextStepMap: Record<number, { prompt: string, nextStep: GenerationStep, skipAppend?: boolean }> = {
         [GenerationStep.PHAN_MO_DAU]: {
           prompt: `
-Tiếp tục viết CHƯƠNG 1: TỔNG QUAN TÀI LIỆU
+Tiếp tục viết PHẦN II. NỘI DUNG NGHIÊN CỨU
+CHƯƠNG 1. CƠ SỞ LÝ LUẬN
 
 Nội dung bao gồm:
-1.1. Cơ sở lý thuyết liên quan đến "${userInfo.projectTitle}"
-     - Các khái niệm cơ bản, định nghĩa khoa học
-     - Lý thuyết nền tảng (trích dẫn APA)
-     
-1.2. Tình hình nghiên cứu trong và ngoài nước
-     - Ít nhất 3-5 nghiên cứu liên quan (trong nước)
-     - Ít nhất 2-3 nghiên cứu quốc tế
+1.1. Khái niệm cơ bản và thuật ngữ then chốt
+1.2. Kiến thức nền tảng liên quan đến "${userInfo.projectTitle}"
+1.3. Các nghiên cứu liên quan (trong và ngoài nước)
+     - Ít nhất 3-5 nghiên cứu liên quan
      - Phân tích khoảng trống nghiên cứu
-     
-1.3. Các khái niệm cơ bản
-     - Định nghĩa, thuật ngữ then chốt
+1.4. Cơ sở khoa học của đề tài
 
 ⚠️ Lĩnh vực: ${userInfo.field}. Trích dẫn theo chuẩn APA.
 ${getPageLimitPrompt()}
-${getSectionPagePrompt('Chương 1: Tổng quan tài liệu', 'chapter1')}
+${getSectionPagePrompt('Chương 1: Cơ sở lý luận', 'chapter1')}
 FORMAT: Xuống dòng sau mỗi câu. Bảng Markdown chuẩn. Ngôn ngữ khoa học.`,
           nextStep: GenerationStep.CHUONG_1
         },
         [GenerationStep.CHUONG_1]: {
           prompt: `
-Tiếp tục viết CHƯƠNG 2: ĐỐI TƯỢNG VÀ PHƯƠNG PHÁP NGHIÊN CỨU
+Tiếp tục viết CHƯƠNG 2. THỰC TRẠNG
 
 Nội dung bao gồm:
-2.1. Đối tượng nghiên cứu
-     - Mô tả chi tiết đối tượng: ${userInfo.researchSubjects || 'Chưa xác định'}
-     - Phạm vi nghiên cứu (thời gian: ${userInfo.timeframe || 'Năm học hiện tại'})
-
-2.2. Phương pháp nghiên cứu cụ thể
-     - Phương pháp chính: ${userInfo.methods}
-     - Mô tả chi tiết từng phương pháp
-     
-2.3. Thiết kế thí nghiệm / Quy trình nghiên cứu
-     - Sơ đồ quy trình (mô tả dạng bước)
-     - Nhóm thực nghiệm và nhóm đối chứng (nếu có)
-     - Các biến số: biến độc lập, biến phụ thuộc, biến kiểm soát
-
-2.4. Công cụ và phương tiện nghiên cứu
-
-2.5. Phương pháp xử lý số liệu
-     - Phần mềm thống kê sử dụng
-     - Các chỉ số phân tích: trung bình, độ lệch chuẩn, p-value
+2.1. Khảo sát thực trạng
+     - Mục đích, đối tượng và phương pháp khảo sát
+2.2. Thu thập dữ liệu
+     - Các nguồn dữ liệu và cách thức thu thập
+2.3. Phân tích số liệu
+     - Phần mềm thống kê sử dụng (nếu có)
+     - Trình bày kết quả phân tích dữ liệu khảo sát
+2.4. Đánh giá hiện trạng
+     - Tóm tắt các vấn đề tồn tại cần giải quyết
 
 ${getPageLimitPrompt()}
-${getSectionPagePrompt('Chương 2: Đối tượng & PP nghiên cứu', 'chapter2')}`,
+${getSectionPagePrompt('Chương 2: Thực trạng', 'chapter2')}
+FORMAT: Xuống dòng sau mỗi câu. Sử dụng bảng biểu và số liệu minh họa cụ thể.`,
           nextStep: GenerationStep.CHUONG_2
         },
         [GenerationStep.CHUONG_2]: {
           prompt: `
-Tiếp tục viết CHƯƠNG 3: KẾT QUẢ NGHIÊN CỨU VÀ THẢO LUẬN
-
-⚠️ ĐÂY LÀ CHƯƠNG QUAN TRỌNG NHẤT - cần bảng biểu, số liệu chi tiết.
+Tiếp tục viết CHƯƠNG 3. THIẾT KẾ GIẢI PHÁP / SẢN PHẨM
 
 Nội dung bao gồm:
-3.1. Kết quả nghiên cứu
-     - Trình bày kết quả bằng BẢNG SỐ LIỆU (Markdown)
-     - Biểu đồ gợi ý (mô tả bằng text)
-     - Số liệu dùng số lẻ tự nhiên (42.3%, 67.8%)
-     - Có p-value, mean, SD khi cần
-
-3.2. Phân tích và thảo luận kết quả
-     - Giải thích các kết quả thu được
-     - So sánh với giả thuyết: "${userInfo.hypothesis}"
-     - Phân tích nguyên nhân
-
-3.3. Sản phẩm nghiên cứu (nếu có)
-     - Mô tả sản phẩm/mô hình/thiết bị đã tạo
-     - Thông số kỹ thuật
-
-3.4. So sánh với các nghiên cứu trước
-     - Điểm tương đồng và khác biệt
-     - Đóng góp mới của nghiên cứu
+3.1. Ý tưởng đề xuất
+     - Giải pháp hoặc sản phẩm cốt lõi
+3.2. Thiết kế
+     - Bản vẽ, sơ đồ kiến trúc hoặc thiết kế chi tiết
+3.3. Quy trình thực hiện/chế tạo
+     - Sơ đồ quy trình (mô tả dạng bước)
+3.4. Nguyên lý hoạt động
+     - Cơ chế hoạt động của giải pháp/sản phẩm
+3.5. Công nghệ sử dụng
+     - Các công cụ, vật liệu, phần mềm áp dụng
+3.6. Hình ảnh mô hình (mô tả bằng text)
+     - Khung cho hình ảnh minh họa thực tế
 
 ${getPageLimitPrompt()}
-${getSectionPagePrompt('Chương 3: Kết quả & Thảo luận', 'chapter3')}
-FORMAT: BẮT BUỘC có ít nhất 2-3 bảng số liệu Markdown. Ngôn ngữ khoa học, khách quan.`,
+${getSectionPagePrompt('Chương 3: Thiết kế giải pháp', 'chapter3')}
+FORMAT: Trình bày logic, có các bước rõ ràng.`,
           nextStep: GenerationStep.CHUONG_3
         },
         [GenerationStep.CHUONG_3]: {
           prompt: `
-Tiếp tục viết CHƯƠNG 4: KẾT LUẬN VÀ KIẾN NGHỊ
+Tiếp tục viết CHƯƠNG 4. THỰC NGHIỆM VÀ ĐÁNH GIÁ và PHẦN III. KẾT LUẬN
 
-Nội dung bao gồm:
-4.1. Kết luận
-     - Tóm tắt kết quả nghiên cứu chính
-     - Kết luận về giả thuyết (chấp nhận/bác bỏ)
-     - Đóng góp của nghiên cứu
+Nội dung CHƯƠNG 4 bao gồm:
+4.1. Cách triển khai thực nghiệm
+4.2. Đối tượng thử nghiệm
+4.3. Kết quả trước - sau (bằng bảng số liệu Markdown)
+     - Số liệu dùng số lẻ tự nhiên (42.3%, 67.8%)
+     - Có p-value, mean, SD khi cần
+4.4. Phân tích kết quả và biểu đồ (mô tả bằng text)
+4.5. Đánh giá hiệu quả của giải pháp/sản phẩm so với giả thuyết: "${userInfo.hypothesis}"
 
-4.2. Kiến nghị
-     - Kiến nghị ứng dụng kết quả
-     - Kiến nghị với nhà trường, địa phương
-
-4.3. Hướng phát triển
-     - Hạn chế của nghiên cứu hiện tại
-     - Hướng nghiên cứu tiếp theo
+Nội dung PHẦN III. KẾT LUẬN bao gồm:
+1. Kết luận chung
+2. Đóng góp của đề tài
+3. Hạn chế
+4. Hướng phát triển
+5. Kiến nghị
 
 TÀI LIỆU THAM KHẢO (chuẩn APA):
 - Liệt kê 10-15 tài liệu (cả tiếng Việt và tiếng Anh)
 - Sắp xếp theo thứ tự ABC tên tác giả
 
 ${getPageLimitPrompt()}
-${getSectionPagePrompt('Chương 4: Kết luận & Kiến nghị', 'chapter4')}`,
+${getSectionPagePrompt('Chương 4: Thực nghiệm & Đánh giá', 'chapter4')}
+FORMAT: BẮT BUỘC có ít nhất 2-3 bảng số liệu Markdown cho phần Thực nghiệm.`,
           nextStep: GenerationStep.CHUONG_4
         },
         [GenerationStep.CHUONG_4]: {
@@ -990,18 +993,18 @@ ${FORMAT_RULES}`;
   const sidebarTree = [
     { step: 0, icon: '📋', label: 'Thông tin dự án', desc: 'Nhập thông tin đề tài' },
     { step: 1, icon: '📝', label: 'Dàn ý tổng quan', desc: 'Lập kế hoạch 4 chương' },
-    { step: 2, icon: '📖', label: 'A. PHẦN MỞ ĐẦU', desc: 'Lý do, Mục đích, Giả thuyết, PP', group: 'intro', children: [
-      'Lý do chọn đề tài', 'Mục đích nghiên cứu', 'Câu hỏi nghiên cứu',
-      'Giả thuyết khoa học', 'Đối tượng & Phạm vi', 'Phương pháp nghiên cứu',
-      'Cơ sở thực hiện', 'Ý nghĩa khoa học', 'Tính sáng tạo'
+    { step: 2, icon: '📖', label: 'PHẦN I. MỞ ĐẦU', desc: 'Lý do, Mục tiêu, Câu hỏi NC', group: 'intro', children: [
+      'Lý do chọn đề tài', 'Mục tiêu nghiên cứu', 'Đối tượng nghiên cứu',
+      'Phạm vi nghiên cứu', 'Câu hỏi nghiên cứu', 'Giả thuyết khoa học',
+      'Ý nghĩa KH & thực tiễn', 'Phương pháp nghiên cứu', 'Tính mới (sáng tạo)'
     ]},
-    { step: -1, icon: '📖', label: 'B. NỘI DUNG', desc: '4 chương nghiên cứu', group: 'body', children: [
-      { step: 3, label: 'Chương 1: Tổng quan tài liệu', subs: ['Khái niệm', 'Tổng quan NC', 'Cơ sở lý thuyết'] },
-      { step: 4, label: 'Chương 2: PP nghiên cứu', subs: ['Đối tượng', 'PP khảo sát', 'Kết quả KS', 'Phân tích'] },
-      { step: 5, label: 'Chương 3: Kết quả', subs: ['Cơ sở đề xuất', 'Giải pháp', 'Thử nghiệm', 'Đánh giá'] },
-      { step: 6, label: 'Chương 4: Kết luận', subs: ['Tóm tắt', 'Kiến nghị', 'Hạn chế', 'Hướng phát triển'] },
+    { step: -1, icon: '📖', label: 'PHẦN II & III', desc: 'Nội dung và Kết luận', group: 'body', children: [
+      { step: 3, label: 'Chương 1. Cơ sở lý luận', subs: ['Khái niệm', 'Kiến thức nền', 'NC liên quan'] },
+      { step: 4, label: 'Chương 2. Thực trạng', subs: ['Khảo sát', 'Thu thập dữ liệu', 'Phân tích số liệu'] },
+      { step: 5, label: 'Chương 3. Giải pháp', subs: ['Ý tưởng', 'Thiết kế', 'Quy trình', 'Mô hình'] },
+      { step: 6, label: 'Chương 4 & Kết luận', subs: ['Thực nghiệm', 'Đánh giá', 'Kết luận', 'Kiến nghị'] },
     ]},
-    { step: 7, icon: '📎', label: 'C. PHỤ LỤC', desc: 'TLTK, Phiếu KS, Số liệu' },
+    { step: 7, icon: '📎', label: 'PHỤ LỤC', desc: 'Phiếu KS, Số liệu, Minh chứng' },
   ];
 
   const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({});

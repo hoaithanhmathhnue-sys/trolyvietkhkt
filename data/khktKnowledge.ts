@@ -55,60 +55,84 @@ export const KHKT_STRUCTURE = {
     items: ['Tên cuộc thi', 'Tên đề tài', 'Lĩnh vực', 'Tên học sinh', 'Lớp', 'Trường', 'Giáo viên hướng dẫn', 'Năm']
   },
   introduction: {
-    title: 'PHẦN MỞ ĐẦU',
+    title: 'PHẦN I. MỞ ĐẦU (TỔNG QUAN)',
     items: [
       '1. Lý do chọn đề tài',
-      '2. Câu hỏi nghiên cứu / Vấn đề nghiên cứu',
-      '3. Giả thuyết khoa học',
-      '4. Mục đích nghiên cứu',
-      '5. Đối tượng và phạm vi nghiên cứu',
-      '6. Phương pháp nghiên cứu',
+      '2. Mục tiêu nghiên cứu',
+      '3. Đối tượng nghiên cứu',
+      '4. Phạm vi nghiên cứu (không gian, thời gian, đối tượng)',
+      '5. Câu hỏi nghiên cứu',
+      '6. Giả thuyết khoa học',
       '7. Ý nghĩa khoa học và thực tiễn',
+      '8. Phương pháp nghiên cứu',
+      '9. Tính mới (tính sáng tạo) của đề tài',
     ]
   },
   chapter1: {
-    title: 'CHƯƠNG 1: TỔNG QUAN TÀI LIỆU',
+    title: 'PHẦN II. NỘI DUNG NGHIÊN CỨU — CHƯƠNG 1: CƠ SỞ LÝ LUẬN',
     items: [
-      '1.1. Cơ sở lý thuyết liên quan',
-      '1.2. Tình hình nghiên cứu trong và ngoài nước',
-      '1.3. Các khái niệm cơ bản',
+      '1.1. Khái niệm',
+      '1.2. Kiến thức nền',
+      '1.3. Các nghiên cứu liên quan',
+      '1.4. Cơ sở khoa học',
     ]
   },
   chapter2: {
-    title: 'CHƯƠNG 2: ĐỐI TƯỢNG VÀ PHƯƠNG PHÁP NGHIÊN CỨU',
+    title: 'CHƯƠNG 2: THỰC TRẠNG',
     items: [
-      '2.1. Đối tượng nghiên cứu',
-      '2.2. Phương pháp nghiên cứu cụ thể',
-      '2.3. Thiết kế thí nghiệm / quy trình nghiên cứu',
-      '2.4. Công cụ và phương tiện nghiên cứu',
-      '2.5. Phương pháp xử lý số liệu',
+      '2.1. Khảo sát',
+      '2.2. Thu thập dữ liệu',
+      '2.3. Phân tích số liệu',
+      '2.4. Đánh giá hiện trạng',
     ]
   },
   chapter3: {
-    title: 'CHƯƠNG 3: KẾT QUẢ NGHIÊN CỨU VÀ THẢO LUẬN',
+    title: 'CHƯƠNG 3: THIẾT KẾ GIẢI PHÁP / SẢN PHẨM',
     items: [
-      '3.1. Kết quả nghiên cứu',
-      '3.2. Phân tích và thảo luận kết quả',
-      '3.3. Sản phẩm nghiên cứu (nếu có)',
-      '3.4. So sánh với các nghiên cứu trước',
+      '3.1. Ý tưởng',
+      '3.2. Thiết kế',
+      '3.3. Quy trình',
+      '3.4. Nguyên lý hoạt động',
+      '3.5. Công nghệ sử dụng',
+      '3.6. Hình ảnh mô hình',
     ]
   },
   chapter4: {
-    title: 'CHƯƠNG 4: KẾT LUẬN VÀ KIẾN NGHỊ',
+    title: 'CHƯƠNG 4: THỰC NGHIỆM VÀ ĐÁNH GIÁ',
     items: [
-      '4.1. Kết luận',
-      '4.2. Kiến nghị',
-      '4.3. Hướng phát triển',
+      '4.1. Cách triển khai',
+      '4.2. Đối tượng thử nghiệm',
+      '4.3. Kết quả trước - sau',
+      '4.4. Biểu đồ và phân tích',
+      '4.5. Đánh giá hiệu quả',
+    ]
+  },
+  conclusion: {
+    title: 'PHẦN III. KẾT LUẬN',
+    items: [
+      '1. Kết luận',
+      '2. Đóng góp của đề tài',
+      '3. Hạn chế',
+      '4. Hướng phát triển',
+      '5. Kiến nghị',
     ]
   },
   appendix: {
     title: 'PHỤ LỤC',
     items: [
-      'Tài liệu tham khảo (APA)',
-      'Phiếu khảo sát (nếu có)',
-      'Bảng số liệu thô',
-      'Hình ảnh minh họa',
-      'Sơ đồ, biểu đồ bổ sung',
+      'Phiếu khảo sát',
+      'Bảng số liệu',
+      'Hình ảnh',
+      'Nhật ký nghiên cứu',
+      'Mã nguồn (nếu có)',
+      'Link website và QR code',
+      'Tài liệu minh chứng',
+    ]
+  },
+  references: {
+    title: 'TÀI LIỆU THAM KHẢO',
+    items: [
+      'Trình bày thống nhất theo chuẩn APA hoặc IEEE',
     ]
   }
 };

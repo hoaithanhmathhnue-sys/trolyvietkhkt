@@ -7,7 +7,7 @@ import { KHKT_FIELDS, FIELD_GROUPS, KHKT_LEVELS, RESEARCH_METHODS } from '../dat
 import { BookOpen, School, GraduationCap, PenTool, MapPin, Calendar, Users, Target, FileUp, Sparkles, Loader2, FileText, Search, X, ChevronDown, Beaker, FlaskConical, Lightbulb, AlertTriangle, Check } from 'lucide-react';
 import * as mammoth from 'mammoth';
 import * as pdfjsLib from 'pdfjs-dist';
-import { initializeGeminiChat, sendSinglePromptStream } from '../services/geminiService';
+import { getFriendlyErrorMessage, initializeGeminiChat, sendSinglePromptStream } from '../services/geminiService';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js`;
 
@@ -40,6 +40,27 @@ const InputGroup: React.FC<{ label: string; icon: any; required?: boolean; actio
 
 const MAX_FILE_SIZE = 100 * 1024 * 1024;
 
+type ResearchSuggestionField = 'problem' | 'objectives' | 'hypothesis' | 'methods';
+
+const RESEARCH_SUGGESTION_CONFIG: Record<ResearchSuggestionField, { label: string; instruction: string }> = {
+  problem: {
+    label: 'Vấn đề nghiên cứu / Lý do chọn đề tài',
+    instruction: `Viết 1-2 đoạn khoảng 120-180 từ. Làm rõ vấn đề thực tiễn, tính cấp thiết, khoảng trống cần nghiên cứu và lý do nhóm học sinh chọn đề tài. Không bịa số liệu, kết quả khảo sát hoặc nguồn trích dẫn.`,
+  },
+  objectives: {
+    label: 'Mục tiêu nghiên cứu',
+    instruction: `Nêu 1 mục tiêu chung và 3-5 mục tiêu cụ thể. Mỗi mục tiêu cụ thể bắt đầu bằng động từ có thể đánh giá như xác định, thiết kế, chế tạo, khảo sát, đo lường, so sánh hoặc đánh giá. Trình bày bằng danh sách gạch đầu dòng.`,
+  },
+  hypothesis: {
+    label: 'Giả thuyết khoa học',
+    instruction: `Viết một giả thuyết ngắn gọn, có thể kiểm chứng, ưu tiên cấu trúc "Nếu... thì...". Chỉ rõ yếu tố tác động, kết quả kỳ vọng và hướng thay đổi; không tự đặt ngưỡng số liệu khi tên đề tài không cung cấp căn cứ.`,
+  },
+  methods: {
+    label: 'Phương pháp nghiên cứu',
+    instruction: `Đề xuất 4-6 phương pháp phù hợp trực tiếp với đề tài. Với mỗi phương pháp, nêu ngắn gọn mục đích sử dụng; nếu có thực nghiệm thì đề cập biến, đối chứng, cách đo và xử lý dữ liệu phù hợp. Không liệt kê phương pháp không liên quan.`,
+  },
+};
+
 export const KHKTForm: React.FC<Props> = ({ userInfo, onChange, onSubmit, onManualSubmit, isSubmitting, apiKey, selectedModel }) => {
   const [mode, setMode] = useState<'ai' | 'manual'>('ai');
   const [manualContent, setManualContent] = useState('');
@@ -63,6 +84,16 @@ export const KHKTForm: React.FC<Props> = ({ userInfo, onChange, onSubmit, onManu
   const [showModalFieldDropdown, setShowModalFieldDropdown] = useState(false);
   const [modalSelectedGroup, setModalSelectedGroup] = useState<string | null>(null);
   const modalFieldDropdownRef = useRef<HTMLDivElement>(null);
+
+  // AI gợi ý riêng cho 4 nội dung nghiên cứu bắt buộc
+  const [suggestingField, setSuggestingField] = useState<ResearchSuggestionField | null>(null);
+  const [researchSuggestionError, setResearchSuggestionError] = useState('');
+
+  useEffect(() => {
+    if (userInfo.projectTitle.trim()) {
+      setResearchSuggestionError('');
+    }
+  }, [userInfo.projectTitle]);
 
   useEffect(() => {
     if (isOpenTitleModal) {
@@ -178,6 +209,87 @@ Hãy sinh 5 đề tài xuất sắc nhất cho học sinh.`;
     } finally {
       setIsGeneratingTitles(false);
     }
+  };
+
+  const generateResearchSuggestion = async (field: ResearchSuggestionField) => {
+    const projectTitle = userInfo.projectTitle.trim();
+    if (!projectTitle) {
+      setResearchSuggestionError('Vui lòng nhập hoặc chọn Tên đề tài KHKT trước khi dùng AI gợi ý.');
+      return;
+    }
+    if (!apiKey) {
+      setResearchSuggestionError('Vui lòng nhập Gemini API Key trong phần Cài đặt trước khi dùng AI gợi ý.');
+      return;
+    }
+
+    const config = RESEARCH_SUGGESTION_CONFIG[field];
+    setSuggestingField(field);
+    setResearchSuggestionError('');
+
+    try {
+      initializeGeminiChat(apiKey, selectedModel);
+
+      const prompt = `Bạn là chuyên gia hướng dẫn học sinh THPT thực hiện đề tài Khoa học Kỹ thuật.
+
+Hãy gợi ý nội dung cho mục "${config.label}" dựa trước hết vào TÊN ĐỀ TÀI sau:
+"${projectTitle}"
+
+Thông tin bổ trợ để hiểu đúng ngữ cảnh (nếu đã có):
+- Lĩnh vực: ${userInfo.field || 'Chưa xác định'}
+- Đối tượng/phạm vi: ${userInfo.researchSubjects || 'Chưa xác định'}
+- Thời gian: ${userInfo.timeframe || 'Chưa xác định'}
+
+Yêu cầu riêng:
+${config.instruction}
+
+Yêu cầu chung:
+- Phù hợp năng lực nghiên cứu của học sinh THPT và đúng cấu trúc đề tài KHKT.
+- Bám sát tên đề tài, dùng tiếng Việt khoa học, rõ ràng, có thể dán trực tiếp vào biểu mẫu.
+- Không bịa số liệu, kết quả, trích dẫn, địa điểm hoặc thông tin chưa được cung cấp.
+- Chỉ trả về nội dung cần điền; không viết tiêu đề mục, lời chào, lời giải thích hay khối mã Markdown.`;
+
+      let suggestion = '';
+      await sendSinglePromptStream(prompt, chunk => {
+        suggestion += chunk;
+      });
+
+      const cleanedSuggestion = suggestion
+        .replace(/^```(?:markdown|text)?\s*/i, '')
+        .replace(/\s*```$/i, '')
+        .trim();
+
+      if (!cleanedSuggestion) {
+        throw new Error('AI chưa trả về nội dung gợi ý. Vui lòng thử lại.');
+      }
+
+      onChange(field, cleanedSuggestion);
+    } catch (err: any) {
+      console.error(`Lỗi AI gợi ý cho ${field}:`, err);
+      const errorInfo = getFriendlyErrorMessage(err);
+      setResearchSuggestionError(`${errorInfo.title}: ${errorInfo.message}`);
+    } finally {
+      setSuggestingField(null);
+    }
+  };
+
+  const renderResearchSuggestionAction = (field: ResearchSuggestionField) => {
+    const isCurrentFieldLoading = suggestingField === field;
+
+    return (
+      <button
+        type="button"
+        onClick={() => generateResearchSuggestion(field)}
+        disabled={suggestingField !== null}
+        aria-label={`AI gợi ý ${RESEARCH_SUGGESTION_CONFIG[field].label}`}
+        className="text-xs font-semibold text-teal-600 hover:text-teal-800 flex items-center gap-1 bg-teal-50 hover:bg-teal-100 px-2.5 py-1 rounded-md transition-all border border-teal-200 hover:border-teal-300 shadow-sm disabled:opacity-60 disabled:cursor-not-allowed"
+      >
+        {isCurrentFieldLoading ? (
+          <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Đang gợi ý...</>
+        ) : (
+          <><Sparkles className="w-3.5 h-3.5" /> AI gợi ý</>
+        )}
+      </button>
+    );
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
@@ -377,26 +489,32 @@ Hãy sinh 5 đề tài xuất sắc nhất cho học sinh.`;
               <h3 className="text-lg font-bold text-teal-800 border-b border-teal-100 pb-2 mb-4 uppercase tracking-wide">
                 2. Nội dung nghiên cứu (Bắt buộc)
               </h3>
+              {researchSuggestionError && (
+                <div className="mb-4 bg-red-50 border border-red-200 text-red-700 p-3 rounded-lg text-sm flex items-start gap-2" role="alert">
+                  <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+                  <span>{researchSuggestionError}</span>
+                </div>
+              )}
               <div className="space-y-5">
-                <InputGroup label="Vấn đề nghiên cứu / Lý do chọn đề tài" icon={Lightbulb} required>
+                <InputGroup label="Vấn đề nghiên cứu / Lý do chọn đề tài" icon={Lightbulb} required action={renderResearchSuggestionAction('problem')}>
                   <TextareaWithHistory name="problem" value={userInfo.problem} onChange={handleChange}
                     className="bg-gray-50 focus:bg-white focus:ring-teal-500 focus:border-teal-500 block w-full pl-10 text-sm border-gray-300 rounded-md p-3 border text-gray-900 placeholder-gray-500"
                     placeholder="Mô tả vấn đề thực tiễn mà đề tài muốn giải quyết..." rows={3} />
                 </InputGroup>
 
-                <InputGroup label="Mục tiêu nghiên cứu" icon={Target} required>
+                <InputGroup label="Mục tiêu nghiên cứu" icon={Target} required action={renderResearchSuggestionAction('objectives')}>
                   <TextareaWithHistory name="objectives" value={userInfo.objectives} onChange={handleChange}
                     className="bg-gray-50 focus:bg-white focus:ring-teal-500 focus:border-teal-500 block w-full pl-10 text-sm border-gray-300 rounded-md p-3 border text-gray-900 placeholder-gray-500"
                     placeholder="VD: Chế tạo vật liệu..., Đánh giá hiệu quả..., So sánh..." rows={2} />
                 </InputGroup>
 
-                <InputGroup label="Giả thuyết khoa học" icon={FlaskConical} required>
+                <InputGroup label="Giả thuyết khoa học" icon={FlaskConical} required action={renderResearchSuggestionAction('hypothesis')}>
                   <TextareaWithHistory name="hypothesis" value={userInfo.hypothesis} onChange={handleChange}
                     className="bg-gray-50 focus:bg-white focus:ring-teal-500 focus:border-teal-500 block w-full pl-10 text-sm border-gray-300 rounded-md p-3 border text-gray-900 placeholder-gray-500"
                     placeholder='VD: "Nếu sử dụng than hoạt tính từ vỏ trấu thì hiệu quả xử lý nước thải đạt trên 80%"' rows={2} />
                 </InputGroup>
 
-                <InputGroup label="Phương pháp nghiên cứu" icon={Beaker} required>
+                <InputGroup label="Phương pháp nghiên cứu" icon={Beaker} required action={renderResearchSuggestionAction('methods')}>
                   <div>
                     <TextareaWithHistory name="methods" value={userInfo.methods} onChange={handleChange}
                       className="bg-gray-50 focus:bg-white focus:ring-teal-500 focus:border-teal-500 block w-full pl-10 text-sm border-gray-300 rounded-md p-3 border text-gray-900 placeholder-gray-500"

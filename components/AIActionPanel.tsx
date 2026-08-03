@@ -136,32 +136,38 @@ export const AIActionPanel: React.FC<AIActionPanelProps> = ({
       setGenSection('Lý do chọn đề tài');
       setQualitySection('Lý do chọn đề tài');
     } else if (currentStep === GenerationStep.CHUONG_1) {
-      setGenSection('Chương 1: Tổng quan tài liệu');
-      setQualitySection('Chương 1: Tổng quan tài liệu');
+      setGenSection('Chương 1: Cơ sở lý luận');
+      setQualitySection('Chương 1: Cơ sở lý luận');
     } else if (currentStep === GenerationStep.CHUONG_2) {
-      setGenSection('Chương 2: Phương pháp nghiên cứu');
-      setQualitySection('Chương 2: Phương pháp nghiên cứu');
+      setGenSection('Chương 2: Thực trạng');
+      setQualitySection('Chương 2: Thực trạng');
     } else if (currentStep === GenerationStep.CHUONG_3) {
-      setGenSection('Chương 3: Kết quả nghiên cứu');
-      setQualitySection('Chương 3: Kết quả nghiên cứu');
+      setGenSection('Chương 3: Thiết kế giải pháp / Sản phẩm');
+      setQualitySection('Chương 3: Thiết kế giải pháp / Sản phẩm');
     } else if (currentStep === GenerationStep.CHUONG_4) {
-      setGenSection('Chương 4: Kết luận & Kiến nghị');
-      setQualitySection('Chương 4: Kết luận & Kiến nghị');
+      setGenSection('Chương 4: Thực nghiệm & Đánh giá');
+      setQualitySection('Chương 4: Thực nghiệm & Đánh giá');
     }
   }, [currentStep]);
 
   // Lấy các phần mục lục tương ứng với KHKT
   const sectionOptions = [
     'Lý do chọn đề tài',
-    'Mục đích nghiên cứu',
-    'Câu hỏi nghiên cứu & Giả thuyết',
-    'Đối tượng & Phạm vi nghiên cứu',
+    'Mục tiêu nghiên cứu',
+    'Đối tượng nghiên cứu',
+    'Phạm vi nghiên cứu',
+    'Câu hỏi nghiên cứu',
+    'Giả thuyết khoa học',
+    'Ý nghĩa khoa học và thực tiễn',
     'Phương pháp nghiên cứu',
-    'Chương 1: Cơ sở lý luận / Tổng quan tài liệu',
-    'Chương 2: Thiết kế & Phương pháp thực nghiệm',
-    'Chương 3: Kết quả nghiên cứu & Thảo luận',
-    'Chương 4: Kết luận & Hướng phát triển',
-    'Phần Phụ lục & Tài liệu tham khảo'
+    'Tính mới (tính sáng tạo) của đề tài',
+    'Chương 1: Cơ sở lý luận',
+    'Chương 2: Thực trạng',
+    'Chương 3: Thiết kế giải pháp / Sản phẩm',
+    'Chương 4: Thực nghiệm và đánh giá',
+    'Phần III: Kết luận',
+    'Phụ lục',
+    'Tài liệu tham khảo'
   ];
 
   // Hàm gọi API sinh nội dung

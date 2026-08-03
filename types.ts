@@ -41,11 +41,11 @@ export enum GenerationStep {
   INPUT_FORM = 0,      // Form nhập thông tin dự án
   OUTLINE = 1,         // Lập dàn ý tổng quan 4 chương
   PHAN_MO_DAU = 2,     // Phần Mở đầu (Lý do, Mục đích, Câu hỏi NC, Giả thuyết, PP)
-  CHUONG_1 = 3,        // Chương 1: Tổng quan tài liệu / Cơ sở lý luận
-  CHUONG_2 = 4,        // Chương 2: Đối tượng & Phương pháp nghiên cứu
-  CHUONG_3 = 5,        // Chương 3: Kết quả nghiên cứu / Sản phẩm
-  CHUONG_4 = 6,        // Chương 4: Kết luận & Kiến nghị
-  PHU_LUC = 7,         // Phụ lục (TLTK, Phiếu KS, Bảng số liệu)
+  CHUONG_1 = 3,        // Chương 1: Cơ sở lý luận
+  CHUONG_2 = 4,        // Chương 2: Thực trạng
+  CHUONG_3 = 5,        // Chương 3: Thiết kế giải pháp / Sản phẩm
+  CHUONG_4 = 6,        // Chương 4: Thực nghiệm & Đánh giá + Phần III. Kết luận
+  PHU_LUC = 7,         // Phụ lục (Phiếu KS, Bảng số liệu, Hình ảnh, Minh chứng)
   COMPLETED = 8        // Hoàn thành
 }
 

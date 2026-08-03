@@ -84,9 +84,9 @@ Bạn là **Chuyên gia hướng dẫn nghiên cứu Khoa học Kỹ thuật (KH
 ### B. KỸ THUẬT VIẾT KHOA HỌC
 
 **1. CẤU TRÚC CHUẨN:**
+- Tuân thủ đúng cấu trúc 3 phần và 4 chương chính.
 - Mỗi chương có tiêu đề rõ ràng
 - Đánh số thứ tự các mục: 1.1, 1.2, 2.1, 2.2...
-- Tuân thủ IMRAD: Introduction - Methods - Results And Discussion
 
 **2. SỐ LIỆU & BẢNG BIỂU:**
 - ✅ Dùng số liệu chính xác, có đơn vị đo
@@ -134,12 +134,13 @@ Bạn là **Chuyên gia hướng dẫn nghiên cứu Khoa học Kỹ thuật (KH
 
 ## 🚀 QUY TRÌNH VIẾT ĐỀ TÀI
 1. Nhận thông tin → Lập dàn ý → HỎI XÁC NHẬN
-2. Viết Phần Mở đầu
-3. Viết Chương 1: Tổng quan tài liệu
-4. Viết Chương 2: Đối tượng & Phương pháp
-5. Viết Chương 3: Kết quả & Thảo luận
-6. Viết Chương 4: Kết luận & Kiến nghị
-7. Viết Phụ lục: TLTK, Phiếu KS, Số liệu
+2. Viết Phần I. Mở đầu (Tổng quan)
+3. Viết Phần II. Nội dung nghiên cứu (Chương 1: Cơ sở lý luận)
+4. Viết Chương 2: Thực trạng
+5. Viết Chương 3: Thiết kế giải pháp/Sản phẩm
+6. Viết Chương 4: Thực nghiệm và đánh giá & Phần III. Kết luận
+7. Viết Phụ lục: Phiếu khảo sát, Số liệu, Hình ảnh, Nhật ký, Mã nguồn/Link/QR, Minh chứng
+8. Viết Tài liệu tham khảo riêng, thống nhất theo APA hoặc IEEE
 `;
 
 // ═══════════════════════════════════════════════════════════
@@ -175,11 +176,10 @@ FORMAT OUTPUT:
 export const STEPS_INFO: Record<number, { label: string; description: string }> = {
    0: { label: "Thông tin dự án", description: "Nhập thông tin đề tài KHKT" },
    1: { label: "Dàn ý tổng quan", description: "Lập dàn ý 4 chương" },
-   2: { label: "Phần Mở đầu", description: "Lý do, Mục đích, Giả thuyết, PP" },
-   3: { label: "Chương 1: Tổng quan", description: "Cơ sở lý luận & Tài liệu" },
-   4: { label: "Chương 2: PP nghiên cứu", description: "Đối tượng & Phương pháp" },
-   5: { label: "Chương 3: Kết quả", description: "Kết quả & Thảo luận" },
-   6: { label: "Chương 4: Kết luận", description: "Kết luận & Kiến nghị" },
-   7: { label: "Phụ lục", description: "TLTK, Phiếu KS, Số liệu" },
+   2: { label: "Phần I. Mở đầu", description: "Lý do, Mục tiêu, Câu hỏi NC, Giả thuyết, PP" },
+   3: { label: "Chương 1. Cơ sở lý luận", description: "Khái niệm, Kiến thức nền, Nghiên cứu liên quan" },
+   4: { label: "Chương 2. Thực trạng", description: "Khảo sát, Thu thập & Phân tích dữ liệu" },
+   5: { label: "Chương 3. Thiết kế giải pháp", description: "Ý tưởng, Thiết kế, Quy trình, Mô hình" },
+   6: { label: "Chương 4 & Kết luận", description: "Thực nghiệm, Đánh giá, Kết luận, Kiến nghị" },
+   7: { label: "Phụ lục", description: "Phiếu KS, Số liệu, Hình ảnh, Minh chứng" },
 };
-

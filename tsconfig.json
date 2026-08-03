@@ -27,5 +27,19 @@
     "esModuleInterop": true,
     "allowImportingTsExtensions": true,
     "noEmit": true
-  }
+  },
+  "include": [
+    "*.ts",
+    "*.tsx",
+    "components/**/*.ts",
+    "components/**/*.tsx",
+    "data/**/*.ts",
+    "services/**/*.ts"
+  ],
+  "exclude": [
+    "dist",
+    "node_modules",
+    "khkt-writer-pro",
+    "KIEN THUC CAC MON"
+  ]
 }
