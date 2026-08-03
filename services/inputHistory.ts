@@ -38,7 +38,8 @@ export function getFieldHistory(fieldName: string): string[] {
  * - Giới hạn số lượng
  */
 export function addToHistory(fieldName: string, value: string): void {
-    if (!value || value.trim().length < 3) return; // Không lưu giá trị quá ngắn
+    const trimmedValue = value?.trim();
+    if (!trimmedValue || (fieldName !== 'pageLimit' && trimmedValue.length < 3)) return;
 
     try {
         const history = getInputHistory();
@@ -46,11 +47,11 @@ export function addToHistory(fieldName: string, value: string): void {
 
         // Loại bỏ giá trị trùng lặp (case-insensitive)
         const filtered = fieldHistory.filter(
-            item => item.toLowerCase() !== value.toLowerCase()
+            item => item.toLowerCase() !== trimmedValue.toLowerCase()
         );
 
         // Thêm giá trị mới lên đầu
-        filtered.unshift(value.trim());
+        filtered.unshift(trimmedValue);
 
         // Giới hạn số lượng
         history[fieldName] = filtered.slice(0, MAX_HISTORY_PER_FIELD);
@@ -103,7 +104,7 @@ export function clearAllHistory(): void {
 /**
  * Lưu tất cả fields của form vào lịch sử
  */
-export function saveFormToHistory(formData: Record<string, string>): void {
+export function saveFormToHistory(formData: Record<string, unknown>): void {
     // Các field cần lưu lịch sử
     const fieldsToSave = [
         'projectTitle',
@@ -119,12 +120,14 @@ export function saveFormToHistory(formData: Record<string, string>): void {
         'methods',
         'researchSubjects',
         'timeframe',
-        'specialRequirements'
+        'specialRequirements',
+        'pageLimit'
     ];
 
     fieldsToSave.forEach(field => {
-        if (formData[field]) {
-            addToHistory(field, formData[field]);
+        const value = formData[field];
+        if (typeof value === 'string' || typeof value === 'number') {
+            addToHistory(field, String(value));
         }
     });
 }

@@ -297,7 +297,7 @@ Yêu cầu chung:
   };
 
   const handleSubmitWithHistory = () => {
-    saveFormToHistory(userInfo as unknown as Record<string, string>);
+    saveFormToHistory(userInfo as unknown as Record<string, unknown>);
     onSubmit();
   };
 
@@ -542,22 +542,22 @@ Yêu cầu chung:
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 <InputGroup label="Đối tượng / Phạm vi NC" icon={Users}>
-                  <input type="text" name="researchSubjects" value={userInfo.researchSubjects} onChange={handleChange}
+                  <InputWithHistory type="text" name="researchSubjects" value={userInfo.researchSubjects} onChange={handleChange}
                     className="bg-white focus:ring-teal-500 focus:border-teal-500 block w-full pl-10 text-sm border-gray-300 rounded-md p-3 border text-gray-900 placeholder-gray-500"
                     placeholder="VD: Mẫu nước sông X, Học sinh lớp 11..." />
                 </InputGroup>
                 <InputGroup label="Thời gian thực hiện" icon={Calendar}>
-                  <input type="text" name="timeframe" value={userInfo.timeframe} onChange={handleChange}
+                  <InputWithHistory type="text" name="timeframe" value={userInfo.timeframe} onChange={handleChange}
                     className="bg-white focus:ring-teal-500 focus:border-teal-500 block w-full pl-10 text-sm border-gray-300 rounded-md p-3 border text-gray-900 placeholder-gray-500"
                     placeholder="VD: Tháng 9/2024 - 3/2025" />
                 </InputGroup>
                 <InputGroup label="Yêu cầu đặc biệt" icon={Target}>
-                  <input type="text" name="specialRequirements" value={userInfo.specialRequirements} onChange={handleChange}
+                  <InputWithHistory type="text" name="specialRequirements" value={userInfo.specialRequirements} onChange={handleChange}
                     className="bg-white focus:ring-teal-500 focus:border-teal-500 block w-full pl-10 text-sm border-gray-300 rounded-md p-3 border text-gray-900 placeholder-gray-500"
                     placeholder="VD: Tập trung vào tính ứng dụng, Có sản phẩm thực tế..." />
                 </InputGroup>
                 <InputGroup label="Giới hạn trang" icon={FileText}>
-                  <input type="number" name="pageLimit" value={userInfo.pageLimit} onChange={handleChange} min={15} max={100}
+                  <InputWithHistory type="number" name="pageLimit" value={userInfo.pageLimit} onChange={handleChange} min={15} max={100}
                     className="bg-white focus:ring-teal-500 focus:border-teal-500 block w-full pl-10 text-sm border-gray-300 rounded-md p-3 border text-gray-900 placeholder-gray-500"
                     placeholder="VD: 30 (để trống = không giới hạn)" />
                 </InputGroup>

@@ -4,12 +4,14 @@ import { X, History, Clock } from 'lucide-react';
 
 interface InputWithHistoryProps {
     name: string;
-    value: string;
+    value: string | number;
     onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
     placeholder?: string;
     className?: string;
     required?: boolean;
     type?: string;
+    min?: number;
+    max?: number;
 }
 
 /**
@@ -23,7 +25,9 @@ export const InputWithHistory: React.FC<InputWithHistoryProps> = ({
     placeholder,
     className = '',
     required = false,
-    type = 'text'
+    type = 'text',
+    min,
+    max
 }) => {
     const [showHistory, setShowHistory] = useState(false);
     const [history, setHistory] = useState<string[]>([]);
@@ -35,7 +39,7 @@ export const InputWithHistory: React.FC<InputWithHistoryProps> = ({
         const fieldHistory = getFieldHistory(name);
         // Lọc ra các giá trị khác với giá trị hiện tại
         const filtered = fieldHistory.filter(
-            item => item.toLowerCase() !== value.toLowerCase()
+            item => item.toLowerCase() !== String(value).toLowerCase()
         );
         setHistory(filtered);
     };
@@ -90,6 +94,8 @@ export const InputWithHistory: React.FC<InputWithHistoryProps> = ({
                 onFocus={handleFocus}
                 placeholder={placeholder}
                 required={required}
+                min={min}
+                max={max}
                 className={className}
                 autoComplete="off"
             />
