@@ -533,7 +533,11 @@ Yêu cầu chung:
     <div className="w-full max-w-4xl mx-auto bg-white rounded-xl shadow-xl border border-teal-100 overflow-hidden my-8">
       <div className="bg-gradient-to-r from-teal-600 to-emerald-600 p-6 text-white text-center">
         <h2 className="text-3xl font-bold mb-2">🔬 Thiết lập Đề tài KHKT</h2>
-        <p className="text-teal-100 opacity-90">Cung cấp thông tin dự án để AI tạo bản thảo đề tài khoa học kỹ thuật</p>
+        <p className="text-teal-100 opacity-90 mb-2">Cung cấp thông tin dự án để AI tạo bản thảo đề tài khoa học kỹ thuật</p>
+        <p className="text-sm text-teal-50">
+          Tác giả: Trần Hoài Thanh - Zalo: 0348296773<br/>
+          Truy cập tool AI dành cho giáo viên tại: <a href="https://giaovienai.vercel.app/" target="_blank" rel="noopener noreferrer" className="underline hover:text-white">https://giaovienai.vercel.app/</a>
+        </p>
       </div>
 
       <div className="p-8 space-y-8">
