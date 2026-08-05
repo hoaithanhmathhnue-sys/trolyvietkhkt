@@ -657,151 +657,87 @@ NHIỆM VỤ: Viết chi tiết PHẦN I. MỞ ĐẦU (Tổng quan) gồm:
 
 ⚠️ THÔNG TIN ĐỀ TÀI:
 - Tên đề tài: ${userInfo.projectTitle}
-- Lĩnh vực: ${userInfo.field}
-- Trường: ${userInfo.school}, ${userInfo.location}
-- Thành viên: ${userInfo.members}
-- GVHD: ${userInfo.advisor}
-
-${getPageLimitPrompt()}
-${getSectionPagePrompt('Phần I. Mở đầu', 'intro')}
-
-FORMAT: Xuống dòng sau mỗi câu. Tách đoạn rõ ràng. Ngôn ngữ khoa học.`;
+- KHÔNG tạo phụ lục hình ảnh, video (không hiển thị được)`;
 
       nextStepEnum = GenerationStep.PHAN_MO_DAU;
-    } else {
-      const nextStepMap: Record<number, { prompt: string, nextStep: GenerationStep, skipAppend?: boolean }> = {
-        [GenerationStep.PHAN_MO_DAU]: {
-          prompt: `
-Tiếp tục viết PHẦN II. NỘI DUNG NGHIÊN CỨU
-CHƯƠNG 1. CƠ SỞ LÝ LUẬN
+      shouldAppend = true;
+    } else if (state.step === GenerationStep.PHAN_MO_DAU) {
+      currentStepPrompt = `
+Dựa vào DÀN Ý CHÍNH THỨC, hãy viết chi tiết CHƯƠNG 1: CƠ SỞ LÝ LUẬN
+- 1.1. Khái niệm
+- 1.2. Kiến thức nền
+- 1.3. Các nghiên cứu liên quan
+- 1.4. Cơ sở khoa học
 
-Nội dung bao gồm:
-1.1. Khái niệm cơ bản và thuật ngữ then chốt
-1.2. Kiến thức nền tảng liên quan đến "${userInfo.projectTitle}"
-1.3. Các nghiên cứu liên quan (trong và ngoài nước)
-     - Ít nhất 3-5 nghiên cứu liên quan
-     - Phân tích khoảng trống nghiên cứu
-1.4. Cơ sở khoa học của đề tài
+LƯU Ý: Không nhắc lại Phần Mở đầu, chỉ viết tiếp Chương 1.`;
+      nextStepEnum = GenerationStep.CHUONG_1;
+    } else if (state.step === GenerationStep.CHUONG_1) {
+      currentStepPrompt = `
+Dựa vào DÀN Ý CHÍNH THỨC, hãy viết chi tiết CHƯƠNG 2: THỰC TRẠNG
+- 2.1. Khảo sát
+- 2.2. Thu thập dữ liệu
+- 2.3. Phân tích số liệu
+- 2.4. Đánh giá hiện trạng
 
-⚠️ Lĩnh vực: ${userInfo.field}. Trích dẫn theo chuẩn APA.
-${getPageLimitPrompt()}
-${getSectionPagePrompt('Chương 1: Cơ sở lý luận', 'chapter1')}
-FORMAT: Xuống dòng sau mỗi câu. Bảng Markdown chuẩn. Ngôn ngữ khoa học.`,
-          nextStep: GenerationStep.CHUONG_1
-        },
-        [GenerationStep.CHUONG_1]: {
-          prompt: `
-Tiếp tục viết CHƯƠNG 2. THỰC TRẠNG
+LƯU Ý: Nếu đề tài yêu cầu có số liệu, hãy tự sinh số liệu giả lập logic, sử dụng định dạng bảng Markdown.`;
+      nextStepEnum = GenerationStep.CHUONG_2;
+    } else if (state.step === GenerationStep.CHUONG_2) {
+      currentStepPrompt = `
+Dựa vào DÀN Ý CHÍNH THỨC, hãy viết chi tiết CHƯƠNG 3: THIẾT KẾ GIẢI PHÁP / SẢN PHẨM
+- 3.1. Ý tưởng
+- 3.2. Thiết kế
+- 3.3. Quy trình
+- 3.4. Nguyên lý hoạt động
+- 3.5. Công nghệ sử dụng
+- 3.6. Hình ảnh mô hình
 
-Nội dung bao gồm:
-2.1. Khảo sát thực trạng
-     - Mục đích, đối tượng và phương pháp khảo sát
-2.2. Thu thập dữ liệu
-     - Các nguồn dữ liệu và cách thức thu thập
-2.3. Phân tích số liệu
-     - Phần mềm thống kê sử dụng (nếu có)
-     - Trình bày kết quả phân tích dữ liệu khảo sát
-2.4. Đánh giá hiện trạng
-     - Tóm tắt các vấn đề tồn tại cần giải quyết
+LƯU Ý: Trình bày chi tiết, chuyên sâu, bám sát các phương pháp khoa học đã nêu.`;
+      nextStepEnum = GenerationStep.CHUONG_3;
+    } else if (state.step === GenerationStep.CHUONG_3) {
+      currentStepPrompt = `
+Dựa vào DÀN Ý CHÍNH THỨC, hãy viết chi tiết CHƯƠNG 4: THỰC NGHIỆM VÀ ĐÁNH GIÁ & PHẦN III: KẾT LUẬN
+Chương 4:
+- 4.1. Cách triển khai
+- 4.2. Đối tượng thử nghiệm
+- 4.3. Kết quả trước - sau
+- 4.4. Biểu đồ và phân tích
+- 4.5. Đánh giá hiệu quả
 
-${getPageLimitPrompt()}
-${getSectionPagePrompt('Chương 2: Thực trạng', 'chapter2')}
-FORMAT: Xuống dòng sau mỗi câu. Sử dụng bảng biểu và số liệu minh họa cụ thể.`,
-          nextStep: GenerationStep.CHUONG_2
-        },
-        [GenerationStep.CHUONG_2]: {
-          prompt: `
-Tiếp tục viết CHƯƠNG 3. THIẾT KẾ GIẢI PHÁP / SẢN PHẨM
+Phần III:
+- 1. Kết luận
+- 2. Đóng góp của đề tài
+- 3. Hạn chế
+- 4. Hướng phát triển
+- 5. Kiến nghị
 
-Nội dung bao gồm:
-3.1. Ý tưởng đề xuất
-     - Giải pháp hoặc sản phẩm cốt lõi
-3.2. Thiết kế
-     - Bản vẽ, sơ đồ kiến trúc hoặc thiết kế chi tiết
-3.3. Quy trình thực hiện/chế tạo
-     - Sơ đồ quy trình (mô tả dạng bước)
-3.4. Nguyên lý hoạt động
-     - Cơ chế hoạt động của giải pháp/sản phẩm
-3.5. Công nghệ sử dụng
-     - Các công cụ, vật liệu, phần mềm áp dụng
-3.6. Hình ảnh mô hình (mô tả bằng text)
-     - Khung cho hình ảnh minh họa thực tế
-
-${getPageLimitPrompt()}
-${getSectionPagePrompt('Chương 3: Thiết kế giải pháp', 'chapter3')}
-FORMAT: Trình bày logic, có các bước rõ ràng.`,
-          nextStep: GenerationStep.CHUONG_3
-        },
-        [GenerationStep.CHUONG_3]: {
-          prompt: `
-Tiếp tục viết CHƯƠNG 4. THỰC NGHIỆM VÀ ĐÁNH GIÁ và PHẦN III. KẾT LUẬN
-
-Nội dung CHƯƠNG 4 bao gồm:
-4.1. Cách triển khai thực nghiệm
-4.2. Đối tượng thử nghiệm
-4.3. Kết quả trước - sau (bằng bảng số liệu Markdown)
-     - Số liệu dùng số lẻ tự nhiên (42.3%, 67.8%)
-     - Có p-value, mean, SD khi cần
-4.4. Phân tích kết quả và biểu đồ (mô tả bằng text)
-4.5. Đánh giá hiệu quả của giải pháp/sản phẩm so với giả thuyết: "${userInfo.hypothesis}"
-
-Nội dung PHẦN III. KẾT LUẬN bao gồm:
-1. Kết luận chung
-2. Đóng góp của đề tài
-3. Hạn chế
-4. Hướng phát triển
-5. Kiến nghị
-
-TÀI LIỆU THAM KHẢO (chuẩn APA):
-- Liệt kê 10-15 tài liệu (cả tiếng Việt và tiếng Anh)
-- Sắp xếp theo thứ tự ABC tên tác giả
-
-${getPageLimitPrompt()}
-${getSectionPagePrompt('Chương 4: Thực nghiệm & Đánh giá', 'chapter4')}
-FORMAT: BẮT BUỘC có ít nhất 2-3 bảng số liệu Markdown cho phần Thực nghiệm.`,
-          nextStep: GenerationStep.CHUONG_4
-        },
-        [GenerationStep.CHUONG_4]: {
-          prompt: `
-✅ ĐỀ TÀI KHKT ĐÃ HOÀN THÀNH NỘI DUNG CHÍNH!
-
-📌 BÂY GIỜ BẠN CÓ THỂ:
-1. Xuất file Word để chỉnh sửa chi tiết
-2. Tạo PHỤ LỤC chi tiết bằng nút "TẠO PHỤ LỤC"
-3. Kiểm tra lại nội dung và định dạng
-
-Chúc mừng nhóm nghiên cứu đã hoàn thành bản thảo đề tài KHKT!`,
-          nextStep: GenerationStep.COMPLETED,
-          skipAppend: true
-        }
-      };
-      const stepConfig = nextStepMap[state.step];
-      if (!stepConfig) return;
-      currentStepPrompt = stepConfig.prompt;
-      nextStepEnum = stepConfig.nextStep;
-      shouldAppend = !stepConfig.skipAppend;
+Và cuối cùng là TÀI LIỆU THAM KHẢO chuẩn APA.`;
+      nextStepEnum = GenerationStep.CHUONG_4;
+    } else if (state.step === GenerationStep.CHUONG_4) {
+      nextStepEnum = GenerationStep.COMPLETED;
     }
-    if (!currentStepPrompt) return;
 
-    setState(prev => ({ ...prev, isStreaming: true, error: null, step: nextStepEnum }));
+    if (state.step === GenerationStep.CHUONG_4) {
+      setState(prev => ({ ...prev, step: GenerationStep.COMPLETED }));
+      return;
+    }
 
     try {
-      let sectionText = "\n\n---\n\n"; // Separator
-      await sendMessageStream(currentStepPrompt, (chunk) => {
-        sectionText += chunk;
-        if (shouldAppend) {
-          setState(prev => ({
-            ...prev,
-            fullDocument: prev.fullDocument + chunk
-          }));
-        }
+      setState(prev => ({ ...prev, step: nextStepEnum, isStreaming: true, error: null }));
+      
+      const fullPrompt = `${KHKT_CHAPTER_PROMPT}\n\n${currentStepPrompt}`;
+
+      let generatedText = shouldAppend ? state.fullDocument + "\n\n" : "";
+      
+      await sendMessageStream(fullPrompt, (chunk) => {
+        generatedText += chunk;
+        setState(prev => ({
+          ...prev,
+          fullDocument: generatedText
+        }));
       });
 
-      // Just set streaming to false, step was already set
       setState(prev => ({ ...prev, isStreaming: false }));
-
     } catch (error: any) {
-      // Thử xoay API key nếu lỗi quota/rate limit
       const errorType = parseApiError(error);
       if (errorType === 'QUOTA_EXCEEDED' || errorType === 'RATE_LIMIT') {
         const rotation = apiKeyManager.markKeyError(apiKey, errorType);
@@ -810,69 +746,48 @@ Chúc mừng nhóm nghiên cứu đã hoàn thành bản thảo đề tài KHKT!
           setApiKey(rotation.newKey);
           localStorage.setItem('gemini_api_key', rotation.newKey);
           initializeGeminiChat(rotation.newKey, selectedModel);
-          // Tự động thử lại với key mới
           setState(prev => ({ ...prev, isStreaming: false, error: null }));
+          
+          setState(prev => ({ ...prev, step: state.step }));
           setTimeout(() => generateNextSection(), 500);
           return;
         }
       }
-      setState(prev => ({ ...prev, isStreaming: false, error: error.message }));
+      setState(prev => ({ ...prev, isStreaming: false, error: error.message || "Đã xảy ra lỗi." }));
     }
   };
 
-  // Export to Word
+  // Export Main Document to Word
   const exportToWord = async () => {
     try {
       const { exportMarkdownToDocx } = await import('./services/docxExporter');
-      const filename = `KHKT_${userInfo.projectTitle.substring(0, 30).replace(/[^a-zA-Z0-9\u00C0-\u1EF9]/g, '_')}.docx`;
+      const filename = `KHKT_DeTai_${userInfo.projectTitle.substring(0, 30).replace(/[^a-zA-Z0-9\u00C0-\u1EF9]/g, '_')}.docx`;
       await exportMarkdownToDocx(state.fullDocument, filename);
     } catch (error: any) {
       console.error('Export error:', error);
-      alert('Có lỗi khi xuất file. Vui lòng thử lại.');
+      alert('Có lỗi khi xuất file Word. Vui lòng thử lại.');
     }
   };
 
-
-  // Generate Appendix - Dùng sendSinglePromptStream (không chat) để tránh history tích lũy
-  // Chia thành 3 batch, mỗi batch hoàn toàn độc lập
+  // Generate Appendix
   const generateAppendix = async () => {
     if (!apiKey) {
       setShowApiModal(true);
       return;
     }
 
-    if (!state.fullDocument || state.fullDocument.trim().length < 100) {
-      alert('Chưa có nội dung đề tài KHKT đầy đủ. Vui lòng hoàn thành viết đề tài KHKT trước khi tạo phụ lục.');
-      return;
-    }
-
     setIsAppendixLoading(true);
 
-    // Đảm bảo API key được set cho sendSinglePromptStream
-    initializeGeminiChat(apiKey, selectedModel);
+    const khktContext = truncateForPrompt(state.fullDocument, 15000);
 
-    // === Truncate đề tài KHKT: lấy đầu + cuối, bỏ phần giữa (giải pháp chi tiết) ===
-    const fullDoc = state.fullDocument;
-    const MAX_CONTEXT = 20000;
-    let khktContext = fullDoc;
-    if (fullDoc.length > MAX_CONTEXT) {
-      const headSize = 12000;
-      const tailSize = 8000;
-      khktContext = fullDoc.substring(0, headSize)
-        + '\n\n[...PHẦN GIẢI PHÁP CHI TIẾT ĐÃ LƯỢC BỎ ĐỂ TIẾT KIỆM...]\n\n'
-        + fullDoc.substring(fullDoc.length - tailSize);
-    }
-
-    // === YÊU CẦU FORMAT DÙNG CHUNG ===
     const FORMAT_RULES = `
-YÊU CẦU FORMAT VÀ NỘI DUNG (BẮT BUỘC):
-- VIẾT ĐẦY ĐỦ NỘI DUNG thực tế, KHÔNG viết tắt, KHÔNG ghi "...", "[nội dung]", "[điền vào]"
-- Phiếu khảo sát: 10-15 câu hỏi cụ thể. Giáo án: chi tiết từng hoạt động
-- Rubric: đầy đủ tiêu chí. Bài tập: đề bài + đáp án. Số liệu: khớp đề tài KHKT
-- Markdown chuẩn, bảng đầy đủ cột, bắt đầu từ đầu dòng
-- KHÔNG tạo phụ lục hình ảnh, video (không hiển thị được)`;
+QUY TẮC ĐỊNH DẠNG:
+- KHÔNG tạo bất kỳ hình ảnh nào (tuyệt đối KHÔNG DÙNG cú pháp ![image]).
+- Trình bày toàn bộ dưới dạng markdown rõ ràng, xuống dòng sau mỗi câu.
+- Có bảng biểu minh họa đầy đủ với số liệu logic.
+- Đảm bảo sinh ra ĐẦY ĐỦ VÀ CHI TIẾT toàn bộ các phụ lục liên quan (3-7 phụ lục) TRONG MỘT LẦN TRẢ LỜI, không được ngắt quãng hay yêu cầu xem phần tiếp theo.
+- Hãy viết ngay nội dung phụ lục, KHÔNG CẦN CÂU CHÀO HAY XÁC NHẬN.`;
 
-    // === THÔNG TIN ĐỀ TÀI ===
     const TOPIC_INFO = `
 - Tên đề tài: ${userInfo.projectTitle}
 - Lĩnh vực: ${userInfo.field} | Cấp: ${userInfo.level}
@@ -882,12 +797,7 @@ YÊU CẦU FORMAT VÀ NỘI DUNG (BẮT BUỘC):
     let generatedAppendix = "";
 
     try {
-
-      // =============================================
-      // BATCH 1: Gửi đề tài KHKT context + viết 2 phụ lục đầu
-      // Dùng sendSinglePromptStream (KHÔNG chat, KHÔNG history)
-      // =============================================
-      const batch1Prompt = `TẠO TÀI LIỆU PHỤ LỤC CHO ĐỀ TÀI KHKT (PHẦN 1/3)
+      const prompt = `TẠO TÀI LIỆU PHỤ LỤC CHO ĐỀ TÀI KHKT
 
 Dựa vào NỘI DUNG ĐỀ TÀI KHKT bên dưới, tạo phụ lục KHỚP với nội dung, số liệu, giải pháp đã đề cập.
 
@@ -896,67 +806,18 @@ ${khktContext}
 
 THÔNG TIN ĐỀ TÀI:${TOPIC_INFO}
 
-Xác định các phụ lục cần tạo (3-7 phụ lục tùy dàn ý). Liệt kê ngắn gọn danh sách (2-3 dòng), rồi VIẾT CHI TIẾT 2 PHỤ LỤC ĐẦU TIÊN.
+YÊU CẦU:
+Viết chi tiết, đầy đủ toàn bộ các phụ lục cần thiết (như Phiếu khảo sát, Bảng số liệu, Giáo án minh họa, Bài tập mẫu...) cho đề tài trên.
+- Bạn phải hoàn thành tất cả phụ lục trong lần này, tuyệt đối KHÔNG ngắt giữa chừng, không báo "Xem phần sau".
+- Đối với Giáo án (nếu có): Viết 4 hoạt động đầy đủ.
+- Đối với Bài tập (nếu có): Có đề và đáp án.
 
 ${FORMAT_RULES}`;
 
-      const batch1Response = await sendSinglePromptStream(batch1Prompt, (chunk) => {
+      await sendSinglePromptStream(prompt, (chunk) => {
         generatedAppendix += chunk;
         setAppendixDocument(generatedAppendix);
       });
-
-      // =============================================
-      // BATCH 2: Viết phụ lục 3 và 4 (độc lập, không history)
-      // =============================================
-      generatedAppendix += "\n\n";
-      const batch2Prompt = `TIẾP TỤC TẠO PHỤ LỤC CHO ĐỀ TÀI KHKT (PHẦN 2/3)
-
-Bạn đang tạo PHỤ LỤC CHO ĐỀ TÀI KHKT. Ở phần 1, bạn đã viết:
-${batch1Response.substring(0, 3000)}
-
-THÔNG TIN ĐỀ TÀI:${TOPIC_INFO}
-
-Tiếp tục viết CHI TIẾT 2 PHỤ LỤC TIẾP THEO (phụ lục thứ 3 và 4 trong danh sách).
-Nếu danh sách chỉ có 3 phụ lục → chỉ viết phụ lục 3 rồi kết thúc.
-
-Đối với GIÁO ÁN MINH HỌA (nếu có): Theo Công văn 5512/BGDĐT, viết chi tiết 4 hoạt động (Khởi động, Hình thành kiến thức mới, Luyện tập, Vận dụng), mỗi hoạt động có Mục tiêu/Nội dung/Sản phẩm/Tổ chức thực hiện.
-
-${FORMAT_RULES}`;
-
-      const batch2Response = await sendSinglePromptStream(batch2Prompt, (chunk) => {
-        generatedAppendix += chunk;
-        setAppendixDocument(generatedAppendix);
-      });
-
-      // Kiểm tra xem đã hoàn thành chưa (nếu chỉ có 3-4 phụ lục)
-      const allContent = batch1Response + batch2Response;
-      const isAlreadyComplete = allContent.includes("HOÀN THÀNH TẠO TÀI LIỆU PHỤ LỤC");
-
-      // =============================================
-      // BATCH 3: Viết TẤT CẢ phụ lục còn lại (nếu có)
-      // =============================================
-      if (!isAlreadyComplete) {
-        generatedAppendix += "\n\n";
-        const batch3Prompt = `TIẾP TỤC TẠO PHỤ LỤC CHO ĐỀ TÀI KHKT (PHẦN 3/3 - CUỐI CÙNG)
-
-Bạn đang tạo PHỤ LỤC CHO ĐỀ TÀI KHKT. Ở phần 1 và 2, bạn đã viết các phụ lục trước.
-Phần 2 kết thúc với:
-${batch2Response.substring(Math.max(0, batch2Response.length - 2000))}
-
-THÔNG TIN ĐỀ TÀI:${TOPIC_INFO}
-
-Tiếp tục viết CHI TIẾT TẤT CẢ PHỤ LỤC CÒN LẠI chưa viết.
-
-Đối với BÀI TẬP MẪU (nếu có): Phù hợp môn ${userInfo.field} lớp ${userInfo.level}, có đề bài + đáp án chi tiết.
-Đối với BẢNG TỔNG HỢP (nếu có): Bảng trước/sau thực nghiệm + so sánh, số liệu lẻ tự nhiên.
-
-${FORMAT_RULES}`;
-
-        await sendSinglePromptStream(batch3Prompt, (chunk) => {
-          generatedAppendix += chunk;
-          setAppendixDocument(generatedAppendix);
-        });
-      }
 
       setIsAppendixLoading(false);
     } catch (error: any) {
