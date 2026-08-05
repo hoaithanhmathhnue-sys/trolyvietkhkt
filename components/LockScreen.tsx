@@ -44,6 +44,17 @@ export const LockScreen: React.FC<LockScreenProps> = ({ onLogin }) => {
           </div>
           <h1 className="text-xl font-bold text-white">TRỢ LÝ VIẾT KHOA HỌC KỸ THUẬT 2026</h1>
           <p className="text-teal-100 text-sm mt-1">Đăng nhập để sử dụng ứng dụng</p>
+          <div className="mt-4 p-3 bg-white/10 rounded-lg text-white/90 text-xs text-left backdrop-blur-sm border border-white/20">
+            <p className="mb-1">
+              ▶️ Xem hướng dẫn sử dụng app tại:{' '}
+              <a href="https://www.youtube.com/watch?v=vUmkae1fRHM" target="_blank" rel="noopener noreferrer" className="font-semibold underline hover:text-white">
+                https://www.youtube.com/watch?v=vUmkae1fRHM
+              </a>
+            </p>
+            <p>
+              💬 Liên hệ sử dụng các app theo zalo: <span className="font-semibold">0348296773</span>
+            </p>
+          </div>
         </div>
 
         <div className="p-8">
