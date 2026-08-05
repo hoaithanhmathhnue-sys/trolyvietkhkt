@@ -265,6 +265,21 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ isOpen, onSave, onClos
                             </a>
                         </div>
 
+                        {/* Tutorial & Contact */}
+                        <div className="mt-4 p-4 bg-sky-50 border border-sky-200 rounded-lg">
+                            <div className="text-sm text-sky-800 space-y-2 flex flex-col">
+                                <span>
+                                    📺 Xem hướng dẫn sử dụng app tại:{' '}
+                                    <a href="https://www.youtube.com/watch?v=vUmkae1fRHM" target="_blank" rel="noopener noreferrer" className="font-semibold underline hover:text-sky-600">
+                                        https://www.youtube.com/watch?v=vUmkae1fRHM
+                                    </a>
+                                </span>
+                                <span>
+                                    💬 Liên hệ sử dụng các app theo zalo: <span className="font-semibold">0348296773</span>
+                                </span>
+                            </div>
+                        </div>
+
                         <div className="mt-3 text-xs text-gray-500">
                             <p>💡 API Key được lưu trên trình duyệt của bạn, không gửi đến bất kỳ server nào khác ngoài Google AI.</p>
                         </div>
