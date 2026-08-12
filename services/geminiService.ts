@@ -1,6 +1,21 @@
 import { GoogleGenAI, Chat } from "@google/genai";
-import { SYSTEM_INSTRUCTION, FALLBACK_MODELS } from "../constants";
+import {
+  SYSTEM_INSTRUCTION,
+  FALLBACK_MODELS,
+  GEMINI_FALLBACK_MODELS,
+  AGENT_PLATFORM_FALLBACK_MODELS,
+  DEFAULT_GEMINI_MODEL,
+  DEFAULT_AGENT_PLATFORM_MODEL,
+  AiProvider
+} from "../constants";
 import { TitleAnalysisResult } from '../types';
+
+export const createGoogleAiClient = (apiKey: string, provider: AiProvider = 'gemini'): GoogleGenAI => {
+  if (provider === 'agent-platform') {
+    return new GoogleGenAI({ vertexai: true, apiKey });
+  }
+  return new GoogleGenAI({ apiKey });
+};
 
 export const getGeminiGenerationConfig = (model: string, extraConfig: any = {}) => {
   const isNewGeminiModel = model.startsWith('gemini-3');
@@ -73,11 +88,11 @@ export const getFriendlyErrorMessage = (error: any): { type: string; title: stri
       return {
         type: 'quota',
         title: '⚠️ Đã vượt quá giới hạn sử dụng',
-        message: 'Bạn đã sử dụng hết lượt gọi API miễn phí trong ngày. Đây là giới hạn từ phía Google, không phải lỗi của ứng dụng.',
+        message: 'Bạn đã sử dụng hết lượt gọi API miễn phí trong ngày. Đây là giới hạn từ phía nhà cung cấp, không phải lỗi của ứng dụng.',
         suggestions: [
-          '🔑 Lấy API Key từ tài khoản Gmail khác: truy cập https://aistudio.google.com/api-keys bằng Gmail khác, tạo key mới rồi dán vào phần Cài đặt (Settings)',
+          '🔑 Lấy API Key từ tài khoản khác hoặc chuyển đổi giữa Google Gemini API và Agent Platform API trong Cài đặt',
           '⏰ Hoặc đợi đến ngày hôm sau khi quota được reset (thường reset lúc 0h theo giờ PST)',
-          '💡 Mẹo: Mỗi tài khoản Gmail đều có quota riêng, bạn có thể dùng nhiều Gmail để có thêm lượt sử dụng'
+          '💡 Mẹo: Mỗi tài khoản đều có quota riêng, bạn có thể nhập API key riêng để có thêm lượt sử dụng'
         ]
       };
 
@@ -95,11 +110,11 @@ export const getFriendlyErrorMessage = (error: any): { type: string; title: stri
     case 'INVALID_API_KEY':
       return {
         type: 'auth',
-        title: '🔐 API Key không hợp lệ',
-        message: 'API Key bạn đang sử dụng không đúng hoặc đã hết hạn.',
+        title: '🔐 API Key không hợp lệ hoặc thiếu quyền',
+        message: 'API Key bạn đang sử dụng không đúng, đã hết hạn hoặc không có quyền truy cập model đã chọn.',
         suggestions: [
-          '🔑 Kiểm tra lại API Key đã nhập',
-          '🆕 Tạo API Key mới tại Google AI Studio',
+          '🔑 Kiểm tra lại API Key đã nhập trong Cài đặt',
+          '🔄 Đảm bảo bạn đã chọn đúng Nhà cung cấp AI (Google Gemini hay Agent Platform)',
           '📋 Đảm bảo copy đầy đủ API Key (không thừa/thiếu ký tự)'
         ]
       };
@@ -108,7 +123,7 @@ export const getFriendlyErrorMessage = (error: any): { type: string; title: stri
       return {
         type: 'network',
         title: '🌐 Lỗi kết nối mạng',
-        message: 'Không thể kết nối đến máy chủ Google AI. Hãy kiểm tra kết nối internet của bạn.',
+        message: 'Không thể kết nối đến máy chủ AI. Hãy kiểm tra kết nối internet của bạn.',
         suggestions: [
           '📶 Kiểm tra kết nối WiFi/Internet',
           '🔄 Thử làm mới trang (F5)',
@@ -128,7 +143,7 @@ export const getFriendlyErrorMessage = (error: any): { type: string; title: stri
       return {
         type: 'not_found',
         title: '❌ Không tìm thấy model (404)',
-        message: 'Model AI đang được gọi không tồn tại hoặc đã bị khóa.',
+        message: 'Model AI đang được gọi không tồn tại hoặc không khả dụng trên Provider hiện tại.',
         suggestions: ['🔄 Đổi sang model khác trong phần Cài đặt']
       };
 
@@ -136,7 +151,7 @@ export const getFriendlyErrorMessage = (error: any): { type: string; title: stri
       return {
         type: 'server_error',
         title: '🌐 Lỗi máy chủ (500/503)',
-        message: 'Máy chủ Google AI đang gặp sự cố. Hệ thống sẽ tự động thử model khác.',
+        message: 'Máy chủ AI đang gặp sự cố. Hệ thống sẽ tự động thử model khác.',
         suggestions: ['⏰ Đợi một lúc rồi thử lại']
       };
 
@@ -147,7 +162,7 @@ export const getFriendlyErrorMessage = (error: any): { type: string; title: stri
         message: error?.message || 'Có lỗi không xác định xảy ra khi gọi AI.',
         suggestions: [
           '🔄 Thử làm mới trang và thực hiện lại',
-          '🔑 Kiểm tra API Key',
+          '🔑 Kiểm tra API Key và Provider',
           '⏰ Đợi một lúc rồi thử lại'
         ]
       };
@@ -157,11 +172,13 @@ export const getFriendlyErrorMessage = (error: any): { type: string; title: stri
 let chatSession: Chat | null = null;
 let currentApiKey: string | null = null;
 let currentSelectedModel: string | null = null;
+let currentProvider: AiProvider = 'gemini';
 let history: any[] = []; // Store history to restore when switching models
 
-export const initializeGeminiChat = (apiKey: string, selectedModel?: string) => {
+export const initializeGeminiChat = (apiKey: string, selectedModel?: string, provider: AiProvider = 'gemini') => {
   currentApiKey = apiKey;
-  currentSelectedModel = selectedModel || FALLBACK_MODELS[0];
+  currentProvider = provider;
+  currentSelectedModel = selectedModel || (provider === 'agent-platform' ? DEFAULT_AGENT_PLATFORM_MODEL : DEFAULT_GEMINI_MODEL);
   chatSession = null;
   history = []; // Reset history on new initialization
 };
@@ -179,7 +196,7 @@ export const setChatHistory = (savedHistory: any[]) => {
 const createChatSession = (model: string) => {
   if (!currentApiKey) throw new Error("API Key not found");
 
-  const ai = new GoogleGenAI({ apiKey: currentApiKey });
+  const ai = createGoogleAiClient(currentApiKey, currentProvider);
 
   return ai.chats.create({
     model: model,
@@ -195,11 +212,9 @@ const createChatSession = (model: string) => {
 
 // Sắp xếp models với model được chọn đầu tiên
 const getOrderedModels = (): string[] => {
-  // Model người dùng chủ động chọn luôn được thử trước, kể cả model Pro/Preview
-  // không nằm trong chuỗi fallback mặc định. Chuỗi fallback chỉ gồm các model
-  // production phổ thông để tránh tự động phát sinh chi phí ngoài ý muốn.
+  const fallbackList = currentProvider === 'agent-platform' ? AGENT_PLATFORM_FALLBACK_MODELS : GEMINI_FALLBACK_MODELS;
   const orderedModels: string[] = currentSelectedModel ? [currentSelectedModel] : [];
-  for (const model of FALLBACK_MODELS) {
+  for (const model of fallbackList) {
     if (!orderedModels.includes(model)) {
       orderedModels.push(model);
     }
@@ -226,15 +241,15 @@ export const sendMessageStream = async (message: string, onChunk: (text: string)
   let lastError: any = null;
   const modelsToTry = getOrderedModels();
 
-  console.log(`🚀 Bắt đầu gửi tin nhắn. Sẽ thử ${modelsToTry.length} model theo thứ tự: ${modelsToTry.join(' → ')}`);
+  console.log(`🚀 Bắt đầu gửi tin nhắn (${currentProvider}). Sẽ thử ${modelsToTry.length} model theo thứ tự: ${modelsToTry.join(' → ')}`);
 
   // Thử lần lượt các model theo thứ tự fallback
   for (const model of modelsToTry) {
     try {
-      console.log(`🤖 Đang thử model: ${model}`);
+      console.log(`🤖 Đang thử model: ${model} (${currentProvider})`);
 
       // Tạo session với model hiện tại
-      const ai = new GoogleGenAI({ apiKey: currentApiKey });
+      const ai = createGoogleAiClient(currentApiKey, currentProvider);
       chatSession = ai.chats.create({
         model: model,
         config: getGeminiGenerationConfig(model, {
@@ -269,7 +284,14 @@ export const sendMessageStream = async (message: string, onChunk: (text: string)
 
       const errorType = parseApiError(error);
       
-      if (errorType !== 'QUOTA_EXCEEDED' && errorType !== 'RATE_LIMIT' && errorType !== 'NOT_FOUND' && errorType !== 'SERVER_ERROR') {
+      let allowFallback = false;
+      if (errorType === 'QUOTA_EXCEEDED' || errorType === 'RATE_LIMIT' || errorType === 'NOT_FOUND' || errorType === 'SERVER_ERROR') {
+        allowFallback = true;
+      } else if (currentProvider === 'agent-platform' && (errorType === 'INVALID_API_KEY' || error?.status === 403 || error?.message?.includes('PERMISSION_DENIED'))) {
+        allowFallback = true;
+      }
+      
+      if (!allowFallback) {
          console.error(`🛑 Lỗi nghiêm trọng (${errorType}), không fallback. Dừng ngay lập tức.`);
          throw error;
       }
@@ -299,13 +321,13 @@ export const sendSinglePromptStream = async (message: string, onChunk: (text: st
   let lastError: any = null;
   const modelsToTry = getOrderedModels();
 
-  console.log(`🚀 [SinglePrompt] Bắt đầu. Thử ${modelsToTry.length} model: ${modelsToTry.join(' → ')}`);
+  console.log(`🚀 [SinglePrompt] Bắt đầu (${currentProvider}). Thử ${modelsToTry.length} model: ${modelsToTry.join(' → ')}`);
 
   for (const model of modelsToTry) {
     try {
       console.log(`🤖 [SinglePrompt] Đang thử model: ${model}`);
 
-      const ai = new GoogleGenAI({ apiKey: currentApiKey });
+      const ai = createGoogleAiClient(currentApiKey, currentProvider);
       const response = await ai.models.generateContentStream({
         model: model,
         config: getGeminiGenerationConfig(model, {
@@ -332,7 +354,14 @@ export const sendSinglePromptStream = async (message: string, onChunk: (text: st
       lastError = error;
       
       const errorType = parseApiError(error);
-      if (errorType !== 'QUOTA_EXCEEDED' && errorType !== 'RATE_LIMIT' && errorType !== 'NOT_FOUND' && errorType !== 'SERVER_ERROR') {
+      let allowFallback = false;
+      if (errorType === 'QUOTA_EXCEEDED' || errorType === 'RATE_LIMIT' || errorType === 'NOT_FOUND' || errorType === 'SERVER_ERROR') {
+        allowFallback = true;
+      } else if (currentProvider === 'agent-platform' && (errorType === 'INVALID_API_KEY' || error?.status === 403 || error?.message?.includes('PERMISSION_DENIED'))) {
+        allowFallback = true;
+      }
+
+      if (!allowFallback) {
          console.error(`🛑 [SinglePrompt] Lỗi nghiêm trọng (${errorType}), không fallback. Dừng ngay lập tức.`);
          throw error;
       }
@@ -343,15 +372,14 @@ export const sendSinglePromptStream = async (message: string, onChunk: (text: st
   console.error(`💀 [SinglePrompt] Tất cả models đều thất bại.`);
   throw lastError || new Error("Tất cả models đều thất bại. Vui lòng thử lại sau.");
 };
-
-// Phân tích tài liệu để trích xuất thông tin cho SKKN (không dùng chat session)
 export const analyzeDocumentForSKKN = async (
   apiKey: string,
   documentContent: string,
   documentType: 'reference' | 'template',
-  selectedModel?: string
+  selectedModel?: string,
+  provider: AiProvider = 'gemini'
 ): Promise<string> => {
-  const ai = new GoogleGenAI({ apiKey });
+  const ai = createGoogleAiClient(apiKey, provider);
 
   // Giới hạn nội dung để tránh vượt token limit
   const truncatedContent = documentContent.substring(0, 20000);
@@ -415,7 +443,7 @@ Hãy phân tích và trả về kết quả theo format sau:
 
 ⚠️ Lưu ý: Trả lời ngắn gọn, súc tích, tập trung vào thông tin cần thiết nhất.`;
 
-  const model = selectedModel || FALLBACK_MODELS[0];
+  const model = selectedModel || (provider === 'agent-platform' ? DEFAULT_AGENT_PLATFORM_MODEL : DEFAULT_GEMINI_MODEL);
 
   try {
     const response = await ai.models.generateContent({
@@ -442,9 +470,10 @@ interface SKKNSection {
 export const extractSKKNStructure = async (
   apiKey: string,
   templateContent: string,
-  selectedModel?: string
+  selectedModel?: string,
+  provider: AiProvider = 'gemini'
 ): Promise<SKKNSection[]> => {
-  const ai = new GoogleGenAI({ apiKey });
+  const ai = createGoogleAiClient(apiKey, provider);
 
   // Giới hạn nội dung để tránh vượt token limit
   const truncatedContent = templateContent.substring(0, 25000);
@@ -481,7 +510,7 @@ QUY TẮC QUAN TRỌNG:
 
 BẮT ĐẦU JSON NGAY:`;
 
-  const model = selectedModel || FALLBACK_MODELS[0];
+  const model = selectedModel || (provider === 'agent-platform' ? DEFAULT_AGENT_PLATFORM_MODEL : DEFAULT_GEMINI_MODEL);
 
   try {
     const response = await ai.models.generateContent({
@@ -491,18 +520,14 @@ BẮT ĐẦU JSON NGAY:`;
 
     const responseText = response.text || '[]';
 
-    // Cố gắng parse JSON từ response
-    // Xử lý trường hợp AI trả về có markdown code block
     let jsonText = responseText.trim();
 
-    // Remove markdown code blocks if present
     if (jsonText.startsWith('```json')) {
       jsonText = jsonText.replace(/^```json\s*/, '').replace(/\s*```$/, '');
     } else if (jsonText.startsWith('```')) {
       jsonText = jsonText.replace(/^```\s*/, '').replace(/\s*```$/, '');
     }
 
-    // Find JSON array in response
     const jsonMatch = jsonText.match(/\[[\s\S]*\]/);
     if (jsonMatch) {
       jsonText = jsonMatch[0];
@@ -510,12 +535,10 @@ BẮT ĐẦU JSON NGAY:`;
 
     const sections: SKKNSection[] = JSON.parse(jsonText);
 
-    // Validate và clean up
     return sections.filter(s => s.id && s.title && typeof s.level === 'number');
 
   } catch (error: any) {
     console.error('Lỗi trích xuất cấu trúc SKKN:', error);
-    // Trả về array rỗng nếu không parse được - sẽ fallback về mẫu chuẩn
     return [];
   }
 };
@@ -529,9 +552,10 @@ export const analyzeTitleSKKN = async (
   title: string,
   subject?: string,
   level?: string,
-  selectedModel?: string
+  selectedModel?: string,
+  provider: AiProvider = 'gemini'
 ): Promise<TitleAnalysisResult> => {
-  const ai = new GoogleGenAI({ apiKey });
+  const ai = createGoogleAiClient(apiKey, provider);
 
   const prompt = `Bạn là chuyên gia phân tích tên đề tài Sáng kiến kinh nghiệm (SKKN) với 20 năm kinh nghiệm.
 
@@ -656,7 +680,7 @@ TRẢ VỀ JSON (KHÔNG có markdown code block, CHỈ JSON thuần):
 
 BẮT ĐẦU JSON NGAY:`;
 
-  const model = selectedModel || FALLBACK_MODELS[0];
+  const model = selectedModel || (provider === 'agent-platform' ? DEFAULT_AGENT_PLATFORM_MODEL : DEFAULT_GEMINI_MODEL);
 
   try {
     const response = await ai.models.generateContent({
@@ -666,17 +690,14 @@ BẮT ĐẦU JSON NGAY:`;
 
     const responseText = response.text || '{}';
 
-    // Xử lý response để lấy JSON
     let jsonText = responseText.trim();
 
-    // Remove markdown code blocks if present
     if (jsonText.startsWith('```json')) {
       jsonText = jsonText.replace(/^```json\s*/, '').replace(/\s*```$/, '');
     } else if (jsonText.startsWith('```')) {
       jsonText = jsonText.replace(/^```\s*/, '').replace(/\s*```$/, '');
     }
 
-    // Find JSON object in response
     const jsonMatch = jsonText.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
       jsonText = jsonMatch[0];

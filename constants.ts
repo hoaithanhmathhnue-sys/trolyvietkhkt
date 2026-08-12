@@ -2,15 +2,44 @@
 // KHKT Writer Pro - Constants & System Instructions
 // ═══════════════════════════════════════════════════════════
 
+export type AiProvider = 'gemini' | 'agent-platform';
+
+export const DEFAULT_GEMINI_MODEL = 'gemini-3.6-flash';
+export const DEFAULT_AGENT_PLATFORM_MODEL = 'gemini-2.5-flash';
+
 export const MODEL_NAME = 'gemini-3.6-flash';
 
-export const FALLBACK_MODELS = [
+export const GEMINI_MODELS = [
+   'gemini-3.6-flash',
+   'gemini-3.5-flash',
+   'gemini-3.5-flash-lite',
+   'gemini-3.1-flash-lite',
+   'gemini-2.5-flash',
+   'gemini-3.1-pro-preview',
+   'gemini-2.5-pro'
+] as const;
+
+export const AGENT_PLATFORM_MODELS = [
+   'gemini-2.5-flash',
+   'gemini-2.5-flash-lite',
+   'gemini-2.5-pro',
+   'gemini-3.1-pro-preview'
+] as const;
+
+export const GEMINI_FALLBACK_MODELS = [
    'gemini-3.6-flash',
    'gemini-3.5-flash',
    'gemini-3.5-flash-lite',
    'gemini-3.1-flash-lite',
    'gemini-2.5-flash'
-];
+] as const;
+
+export const AGENT_PLATFORM_FALLBACK_MODELS = [
+   'gemini-2.5-flash',
+   'gemini-2.5-flash-lite'
+] as const;
+
+export const FALLBACK_MODELS = [...GEMINI_FALLBACK_MODELS];
 
 export const MODEL_DISPLAY_ORDER = [
    'gemini-3.6-flash',
