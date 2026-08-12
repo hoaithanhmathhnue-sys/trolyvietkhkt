@@ -23,10 +23,12 @@ import {
 } from 'lucide-react';
 import { GenerationStep, KHKTProjectInfo } from '../types';
 import { sendSinglePromptStream } from '../services/geminiService';
+import { AiProvider } from '../constants';
 
 interface AIActionPanelProps {
   apiKey: string | null;
   selectedModel: string;
+  provider?: AiProvider;
   currentStep: GenerationStep;
   documentContent: string;
   projectInfo: KHKTProjectInfo;
@@ -89,6 +91,7 @@ const SAMPLE_SENTENCES_DATA = [
 export const AIActionPanel: React.FC<AIActionPanelProps> = ({
   apiKey,
   selectedModel,
+  provider,
   currentStep,
   documentContent,
   projectInfo,
@@ -218,7 +221,7 @@ BẮT ĐẦU VIẾT:
       await sendSinglePromptStream(prompt, (chunk) => {
         accumulatedText += chunk;
         setGenResult(accumulatedText);
-      });
+      }, selectedModel, provider);
       setGenTime(Math.round((Date.now() - startTime) / 100) / 10);
     } catch (err: any) {
       console.error('Lỗi khi sinh nội dung:', err);
@@ -300,7 +303,7 @@ Hãy trả về đoạn văn bản đã chỉnh sửa hoàn chỉnh dưới dạ
       await sendSinglePromptStream(prompt, (chunk) => {
         accumulatedText += chunk;
         setImproveResult(accumulatedText);
-      });
+      }, selectedModel, provider);
     } catch (err: any) {
       console.error('Lỗi khi cải thiện văn bản:', err);
       setError(err.message || 'Không thể gọi AI để cải thiện văn bản.');

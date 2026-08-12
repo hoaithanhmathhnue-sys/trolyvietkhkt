@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { UserInfo, GenerationStep, GenerationState } from './types';
-import { STEPS_INFO, KHKT_CHAPTER_PROMPT, FALLBACK_MODELS, MODEL_DISPLAY_ORDER } from './constants';
+import { STEPS_INFO, KHKT_CHAPTER_PROMPT, GEMINI_FALLBACK_MODELS, AGENT_PLATFORM_FALLBACK_MODELS, GEMINI_MODELS, AGENT_PLATFORM_MODELS, MODEL_INFO, AiProvider, DEFAULT_GEMINI_MODEL, DEFAULT_AGENT_PLATFORM_MODEL } from './constants';
 import { initializeGeminiChat, sendMessageStream, sendSinglePromptStream, getFriendlyErrorMessage, parseApiError, getChatHistory, setChatHistory } from './services/geminiService';
 import { apiKeyManager } from './services/apiKeyManager';
 import { KHKT_FIELDS } from './data/khktKnowledge';
@@ -62,9 +62,10 @@ const App: React.FC = () => {
   const [sessionSavedAt, setSessionSavedAt] = useState<string | null>(null);
 
   // API Key State
+  const [provider, setProvider] = useState<AiProvider>(() => apiKeyManager.getProvider());
   const [apiKey, setApiKey] = useState('');
   const [showApiModal, setShowApiModal] = useState(false);
-  const [selectedModel, setSelectedModel] = useState(FALLBACK_MODELS[0]);
+  const [selectedModel, setSelectedModel] = useState(DEFAULT_GEMINI_MODEL);
 
   // Check LocalStorage on Mount
   useEffect(() => {
@@ -73,28 +74,24 @@ const App: React.FC = () => {
       setIsUnlocked(true);
     }
 
-    // Load API key từ localStorage hoặc .env
-    const savedKey = localStorage.getItem('gemini_api_key');
-    const savedModel = localStorage.getItem('selected_model');
+    const currentProv = apiKeyManager.getProvider();
+    setProvider(currentProv);
 
-    if (savedKey) {
-      setApiKey(savedKey);
+    const activeKey = apiKeyManager.getActiveKey(currentProv);
+    const savedModel = localStorage.getItem('selected_model');
+    const validModels = currentProv === 'agent-platform' ? AGENT_PLATFORM_MODELS : GEMINI_MODELS;
+    const defaultModel = currentProv === 'agent-platform' ? DEFAULT_AGENT_PLATFORM_MODEL : DEFAULT_GEMINI_MODEL;
+
+    if (activeKey) {
+      setApiKey(activeKey);
     } else {
-      // Thử lấy key từ biến môi trường (.env)
-      const envKeys = (import.meta.env.VITE_GEMINI_API_KEYS || '').split(',').map((k: string) => k.trim()).filter((k: string) => k.length > 0);
-      if (envKeys.length > 0) {
-        const firstEnvKey = envKeys[0];
-        setApiKey(firstEnvKey);
-        localStorage.setItem('gemini_api_key', firstEnvKey);
-        console.log('🔑 Tự động sử dụng API key từ biến môi trường');
-      } else {
-        // Không có key nào → hiển thị modal bắt buộc nhập
-        setShowApiModal(true);
-      }
+      setShowApiModal(true);
     }
 
-    if (savedModel && (FALLBACK_MODELS.includes(savedModel) || MODEL_DISPLAY_ORDER.includes(savedModel))) {
+    if (savedModel && (validModels as readonly string[]).includes(savedModel)) {
       setSelectedModel(savedModel);
+    } else {
+      setSelectedModel(defaultModel);
     }
 
     // Kiểm tra phiên làm việc đã lưu
@@ -102,12 +99,10 @@ const App: React.FC = () => {
       const savedSession = localStorage.getItem(SESSION_SAVE_KEY);
       if (savedSession) {
         const sessionData: SessionData = JSON.parse(savedSession);
-        // Invalidate sessions cũ (trước khi xóa review steps) để tránh step number sai
         if (sessionData.sessionVersion !== SESSION_VERSION) {
           console.warn('⚠️ Session cũ không tương thích (thiếu version hoặc version khác). Xóa session.');
           localStorage.removeItem(SESSION_SAVE_KEY);
         }
-        // Chỉ hiện modal khôi phục nếu phiên có tiến trình (step > INPUT_FORM)
         else if (sessionData.state && sessionData.state.step > GenerationStep.INPUT_FORM) {
           setPendingSessionData(sessionData);
           setShowRestoreModal(true);
@@ -121,18 +116,24 @@ const App: React.FC = () => {
     setCheckingAuth(false);
   }, []);
 
-  const handleSaveApiKey = (key: string, model: string) => {
-    localStorage.setItem('gemini_api_key', key);
+  const handleSaveApiKey = (key: string, model: string, newProvider: AiProvider) => {
+    apiKeyManager.setProvider(newProvider);
+    setProvider(newProvider);
+
+    if (newProvider === 'agent-platform') {
+      localStorage.setItem('agent_platform_api_key', key);
+    } else {
+      localStorage.setItem('gemini_api_key', key);
+    }
     localStorage.setItem('selected_model', model);
+
     setApiKey(key);
     setSelectedModel(model);
     setShowApiModal(false);
 
-    // 🆕 Nếu đang có lỗi (ví dụ: hết quota), clear error và reinitialize chat với key mới
     if (state.error) {
       setState(prev => ({ ...prev, error: null }));
-      // Reinitialize chat session với key mới
-      initializeGeminiChat(key, model);
+      initializeGeminiChat(key, model, newProvider);
     }
   };
 
@@ -562,7 +563,7 @@ Cuối dàn ý, hiển thị:
           ...prev,
           fullDocument: generatedText
         }));
-      });
+      }, selectedModel, provider);
 
       setState(prev => ({ ...prev, isStreaming: false }));
 
@@ -570,12 +571,16 @@ Cuối dàn ý, hiển thị:
     } catch (error: any) {
       const errorType = parseApiError(error);
       if (errorType === 'QUOTA_EXCEEDED' || errorType === 'RATE_LIMIT') {
-        const rotation = apiKeyManager.markKeyError(apiKey, errorType);
+        const rotation = apiKeyManager.markKeyError(apiKey, errorType, provider);
         if (rotation.success && rotation.newKey) {
           console.log(`🔄 Tự động xoay key: ${rotation.message}`);
           setApiKey(rotation.newKey);
-          localStorage.setItem('gemini_api_key', rotation.newKey);
-          initializeGeminiChat(rotation.newKey, selectedModel);
+          if (provider === 'agent-platform') {
+            localStorage.setItem('agent_platform_api_key', rotation.newKey);
+          } else {
+            localStorage.setItem('gemini_api_key', rotation.newKey);
+          }
+          initializeGeminiChat(rotation.newKey, selectedModel, provider);
           setState(prev => ({ ...prev, isStreaming: false, error: null }));
           setTimeout(() => startGeneration(), 500);
           return;
@@ -619,7 +624,7 @@ Cuối dàn ý, hiển thị:
           ...prev,
           fullDocument: generatedText
         }));
-      });
+      }, selectedModel, provider);
 
       setState(prev => ({ ...prev, isStreaming: false }));
       setOutlineFeedback(""); // Clear feedback after sending
@@ -734,18 +739,22 @@ Và cuối cùng là TÀI LIỆU THAM KHẢO chuẩn APA.`;
           ...prev,
           fullDocument: generatedText
         }));
-      });
+      }, selectedModel, provider);
 
       setState(prev => ({ ...prev, isStreaming: false }));
     } catch (error: any) {
       const errorType = parseApiError(error);
       if (errorType === 'QUOTA_EXCEEDED' || errorType === 'RATE_LIMIT') {
-        const rotation = apiKeyManager.markKeyError(apiKey, errorType);
+        const rotation = apiKeyManager.markKeyError(apiKey, errorType, provider);
         if (rotation.success && rotation.newKey) {
           console.log(`🔄 Tự động xoay key: ${rotation.message}`);
           setApiKey(rotation.newKey);
-          localStorage.setItem('gemini_api_key', rotation.newKey);
-          initializeGeminiChat(rotation.newKey, selectedModel);
+          if (provider === 'agent-platform') {
+            localStorage.setItem('agent_platform_api_key', rotation.newKey);
+          } else {
+            localStorage.setItem('gemini_api_key', rotation.newKey);
+          }
+          initializeGeminiChat(rotation.newKey, selectedModel, provider);
           setState(prev => ({ ...prev, isStreaming: false, error: null }));
           
           setState(prev => ({ ...prev, step: state.step }));
@@ -817,7 +826,7 @@ ${FORMAT_RULES}`;
       await sendSinglePromptStream(prompt, (chunk) => {
         generatedAppendix += chunk;
         setAppendixDocument(generatedAppendix);
-      });
+      }, selectedModel, provider);
 
       setIsAppendixLoading(false);
     } catch (error: any) {
@@ -1127,6 +1136,7 @@ ${FORMAT_RULES}`;
         onSave={handleSaveApiKey}
         onClose={() => setShowApiModal(false)}
         isDismissible={!!apiKey}
+        currentProvider={provider}
       />
 
       {/* Session Restore Modal */}
@@ -1184,16 +1194,23 @@ ${FORMAT_RULES}`;
         </div>
       )}
 
-      {/* Header Button for Settings + dòng chữ đỏ theo LỆNH.md */}
+      {/* Header Button for Settings */}
       <div className="fixed top-4 right-4 z-50 flex items-center gap-3">
-        <span className="text-red-600 font-bold text-xs sm:text-sm animate-pulse hidden sm:inline">Lấy API key để sử dụng app</span>
         <button
           onClick={() => setShowApiModal(true)}
-          className="flex items-center gap-2 px-4 py-2.5 bg-white/95 backdrop-blur-md rounded-xl shadow-lg border border-blue-100 hover:bg-blue-50 hover:border-blue-200 hover:shadow-xl transition-all duration-200"
-          title="Cấu hình API Key"
+          className="flex items-center gap-2 px-3.5 py-2 bg-white/95 backdrop-blur-md rounded-xl shadow-lg border border-sky-200 hover:bg-sky-50 transition-all duration-200"
+          title="Cấu hình Provider & API Key"
         >
-          <Settings size={18} className="text-blue-600" />
-          <span className="text-blue-700 font-semibold text-sm hidden sm:inline">Cài đặt API Key</span>
+          <Settings size={18} className="text-sky-600" />
+          <div className="text-left hidden sm:block">
+            <div className="text-xs font-bold text-gray-800 flex items-center gap-1.5">
+              <span>{provider === 'agent-platform' ? '🤖 Agent Platform' : '🌐 Gemini AI'}</span>
+              <span className={`px-1.5 py-0.5 text-[10px] rounded ${provider === 'agent-platform' ? 'bg-emerald-100 text-emerald-800 font-semibold' : 'bg-sky-100 text-sky-800 font-semibold'}`}>
+                {provider === 'agent-platform' ? 'Agent API' : 'Gemini'}
+              </span>
+            </div>
+            <div className="text-[10px] text-gray-500 font-mono">{selectedModel}</div>
+          </div>
         </button>
       </div>
 
@@ -1284,26 +1301,34 @@ ${FORMAT_RULES}`;
                   <button
                     onClick={() => {
                       // Xoay sang API key tiếp theo trước khi thử lại
-                      const rotation = apiKeyManager.rotateToNextKey('manual_retry');
+                      const rotation = apiKeyManager.rotateToNextKey('manual_retry', provider);
                       let keyToUse = apiKey;
                       if (rotation.success && rotation.newKey) {
                         keyToUse = rotation.newKey;
                         setApiKey(keyToUse);
-                        localStorage.setItem('gemini_api_key', keyToUse);
+                        if (provider === 'agent-platform') {
+                          localStorage.setItem('agent_platform_api_key', keyToUse);
+                        } else {
+                          localStorage.setItem('gemini_api_key', keyToUse);
+                        }
                         console.log(`🔑 Đã xoay sang key mới: ${rotation.message}`);
                       } else {
                         // Nếu không có key khác, reset tất cả key và thử lại
-                        apiKeyManager.resetAllKeys();
-                        const freshKey = apiKeyManager.getActiveKey();
+                        apiKeyManager.resetAllKeys(provider);
+                        const freshKey = apiKeyManager.getActiveKey(provider);
                         if (freshKey) {
                           keyToUse = freshKey;
                           setApiKey(keyToUse);
-                          localStorage.setItem('gemini_api_key', keyToUse);
+                          if (provider === 'agent-platform') {
+                            localStorage.setItem('agent_platform_api_key', keyToUse);
+                          } else {
+                            localStorage.setItem('gemini_api_key', keyToUse);
+                          }
                           console.log('🔄 Đã reset tất cả key và thử lại');
                         }
                       }
                       setState(prev => ({ ...prev, error: null }));
-                      initializeGeminiChat(keyToUse, selectedModel);
+                      initializeGeminiChat(keyToUse, selectedModel, provider);
                       // Khôi phục chat history trước khi retry
                       const savedHistory = getChatHistory();
                       if (savedHistory.length > 0) {
@@ -1370,6 +1395,7 @@ ${FORMAT_RULES}`;
               <AIActionPanel
                 apiKey={apiKey}
                 selectedModel={selectedModel}
+                provider={provider}
                 currentStep={state.step}
                 documentContent={state.fullDocument}
                 projectInfo={userInfo}

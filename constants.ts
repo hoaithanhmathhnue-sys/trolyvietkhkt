@@ -99,6 +99,12 @@ export const MODEL_INFO: Record<string, ModelInfo> = {
       access: 'free-and-paid',
       status: 'retiring'
    },
+   'gemini-2.5-flash-lite': {
+      name: 'Gemini 2.5 Flash Lite',
+      description: 'Phiên bản nhẹ, tốc độ phản hồi cực nhanh trên Agent Platform',
+      access: 'free-and-paid',
+      status: 'stable'
+   },
    'gemini-2.5-pro': {
       name: 'Gemini 2.5 Pro',
       description: 'Suy luận phức tạp và xử lý tài liệu dài; chỉ giữ để tương thích tạm thời',
