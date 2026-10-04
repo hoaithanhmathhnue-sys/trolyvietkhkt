@@ -4,6 +4,7 @@ export const accounts = [
     { username: "duonghangdtntls@gmail.com", password: "SKKN100", name: "GV" },
     { username: "hatran105.hp@gmail.com", password: "KHKT100", name: "GV" },
     { username: "tdkhang.gvls@gmail.com", password: "KHKT100", name: "GV" },
+    { username: "truongthanh0978@gmail.com", password: "KHKT100", name: "GV" },
     { username: "giaovien", password: "gv2025", name: "Giáo viên" },
 ];
 
