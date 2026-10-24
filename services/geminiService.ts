@@ -1,4 +1,4 @@
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI, ThinkingLevel } from "@google/genai";
 import {
   SYSTEM_INSTRUCTION,
   GEMINI_FALLBACK_MODELS,
@@ -20,18 +20,33 @@ export const createGoogleAiClient = (apiKey: string, provider: AiProvider = 'gem
 
 const isLegacyGemini2 = (model: string) => model.startsWith('gemini-2');
 
-export const getGeminiGenerationConfig = (model: string, extraConfig: any = {}) => {
+export { ThinkingLevel };
+
+/**
+ * Cấu hình sinh theo dòng model:
+ * - Gemini 3+ (kể cả gemini-flash-latest): không gửi temperature/topP/topK (đã deprecated trên 3.x);
+ *   mức suy luận dùng thinkingLevel — MEDIUM cho bước sinh chính, LOW cho bước phụ trợ.
+ *   Không dùng HIGH mặc định (tốn token suy luận, dễ bị ngắt 503/504 khi viết tài liệu dài)
+ *   và không dùng MINIMAL (gemini-3.7/3.8-flash trả 400).
+ *   thinkingLevel chỉ gửi cho provider Gemini API.
+ * - Gemini 2.x: temperature thấp cho văn bản khoa học + thinkingBudget kiểu cũ.
+ */
+export const getGeminiGenerationConfig = (
+  model: string,
+  extraConfig: any = {},
+  options: { provider?: AiProvider; thinkingLevel?: ThinkingLevel } = {}
+) => {
   const config = { ...extraConfig };
 
-  // Gemini 3+ (kể cả gemini-flash-latest): Google khuyến nghị giữ temperature mặc định,
-  // hạ thấp dễ gây lặp vòng khi suy luận. Chỉ chỉnh cho dòng 2.x.
   if (isLegacyGemini2(model)) {
     config.temperature = 0.5;
     config.topK = 64;
     config.topP = 0.95;
   } else {
-    // thinkingBudget là tham số kiểu cũ; để model 3.x tự quyết mức suy luận
     delete config.thinkingConfig;
+    if (options.thinkingLevel && (options.provider ?? 'gemini') === 'gemini') {
+      config.thinkingConfig = { thinkingLevel: options.thinkingLevel };
+    }
   }
   return config;
 };
@@ -242,74 +257,123 @@ export class PartialStreamError extends Error {
   }
 }
 
+// ═══════════════════════════════════════════════════════════
+// Thông báo chuyển model cho giao diện (fallbackNotice)
+// ═══════════════════════════════════════════════════════════
+export type ModelFallbackEvent =
+  | { type: 'switch'; label: string; from: string; to: string; reason: string }
+  | { type: 'done'; label: string };
+
+let modelFallbackListener: ((event: ModelFallbackEvent) => void) | null = null;
+
+/** Đăng ký nhận sự kiện chuyển model; 'done' phát ra khi một lần gọi kết thúc (thành công hay lỗi). */
+export const setModelFallbackListener = (listener: ((event: ModelFallbackEvent) => void) | null) => {
+  modelFallbackListener = listener;
+};
+
+const emitFallbackEvent = (event: ModelFallbackEvent) => {
+  try {
+    modelFallbackListener?.(event);
+  } catch (e) {
+    console.warn('Lỗi trong listener fallback:', e);
+  }
+};
+
+const FALLBACK_REASON_TEXT: Record<string, string> = {
+  QUOTA_EXCEEDED: 'đã hết lượt sử dụng',
+  RATE_LIMIT: 'đang bị giới hạn tốc độ',
+  SERVER_ERROR: 'đang bận',
+  NOT_FOUND: 'không khả dụng',
+  PERMISSION_DENIED: 'không mở cho API key này',
+  INVALID_ARGUMENT: 'không nhận cấu hình yêu cầu',
+};
+
 const streamWithFallback = async (
   message: string,
   onChunk: (text: string) => void,
-  options: { useSearch: boolean; model?: string; provider?: AiProvider; label: string }
+  options: { useSearch: boolean; thinkingLevel: ThinkingLevel; model?: string; provider?: AiProvider; label: string }
 ): Promise<string> => {
   const { apiKey, provider, selectedModel } = resolveCallConfig(options.model, options.provider);
   const modelsToTry = getOrderedModels(selectedModel, provider);
+  // Google Search grounding chỉ bật với Gemini API; Agent Platform chưa xác nhận hỗ trợ ở chế độ API key
+  const useSearch = options.useSearch && provider === 'gemini';
   let lastError: any = null;
 
-  console.log(`🚀 [${options.label}] (${provider}) thử ${modelsToTry.length} model: ${modelsToTry.join(' → ')}`);
+  console.log(`🚀 [${options.label}] (${provider}, thinking ${options.thinkingLevel}${useSearch ? ', search' : ''}) thử ${modelsToTry.length} model: ${modelsToTry.join(' → ')}`);
 
-  for (const model of modelsToTry) {
-    let fullResponse = "";
-    try {
-      const ai = createGoogleAiClient(apiKey, provider);
-      const response = await ai.models.generateContentStream({
-        model,
-        contents: [{ role: 'user', parts: [{ text: message }] }],
-        config: getGeminiGenerationConfig(model, {
-          systemInstruction: SYSTEM_INSTRUCTION,
-          maxOutputTokens: 65536,
-          thinkingConfig: { thinkingBudget: 2048 },
-          ...(options.useSearch ? { tools: [{ googleSearch: {} }] } : {})
-        })
-      });
+  try {
+    for (let i = 0; i < modelsToTry.length; i++) {
+      const model = modelsToTry[i];
+      let fullResponse = "";
+      try {
+        const ai = createGoogleAiClient(apiKey, provider);
+        const response = await ai.models.generateContentStream({
+          model,
+          contents: [{ role: 'user', parts: [{ text: message }] }],
+          config: getGeminiGenerationConfig(model, {
+            systemInstruction: SYSTEM_INSTRUCTION,
+            maxOutputTokens: 65536,
+            thinkingConfig: { thinkingBudget: 2048 },
+            ...(useSearch ? { tools: [{ googleSearch: {} }] } : {})
+          }, { provider, thinkingLevel: options.thinkingLevel })
+        });
 
-      for await (const chunk of response) {
-        if (chunk.text) {
-          const cleanText = sanitizeAIOutput(chunk.text);
-          onChunk(cleanText);
-          fullResponse += cleanText;
+        for await (const chunk of response) {
+          if (chunk.text) {
+            const cleanText = sanitizeAIOutput(chunk.text);
+            onChunk(cleanText);
+            fullResponse += cleanText;
+          }
+        }
+
+        console.log(`✅ [${options.label}] Thành công với model ${model}, ${fullResponse.length} ký tự`);
+        return fullResponse;
+      } catch (error: any) {
+        console.error(`❌ [${options.label}] Model ${model} thất bại:`, error?.message || error);
+        lastError = error;
+
+        // Đã stream ra một phần: chuyển model sẽ viết lại từ đầu và nhân đôi nội dung => dừng, giữ phần đã có
+        if (fullResponse.length > 0) {
+          throw new PartialStreamError(error, fullResponse);
+        }
+
+        const errorType = parseApiError(error);
+        if (!FALLBACK_ERROR_TYPES.has(errorType)) {
+          console.error(`🛑 [${options.label}] Lỗi ${errorType}, không thử model khác.`);
+          throw error;
+        }
+        const nextModel = modelsToTry[i + 1];
+        if (nextModel) {
+          console.log(`⏭️ [${options.label}] Lỗi ${errorType}, chuyển sang ${nextModel}...`);
+          emitFallbackEvent({ type: 'switch', label: options.label, from: model, to: nextModel, reason: FALLBACK_REASON_TEXT[errorType] || 'gặp lỗi' });
         }
       }
-
-      console.log(`✅ [${options.label}] Thành công với model ${model}, ${fullResponse.length} ký tự`);
-      return fullResponse;
-    } catch (error: any) {
-      console.error(`❌ [${options.label}] Model ${model} thất bại:`, error?.message || error);
-      lastError = error;
-
-      // Đã stream ra một phần: chuyển model sẽ viết lại từ đầu và nhân đôi nội dung => dừng, giữ phần đã có
-      if (fullResponse.length > 0) {
-        throw new PartialStreamError(error, fullResponse);
-      }
-
-      const errorType = parseApiError(error);
-      if (!FALLBACK_ERROR_TYPES.has(errorType)) {
-        console.error(`🛑 [${options.label}] Lỗi ${errorType}, không thử model khác.`);
-        throw error;
-      }
-      console.log(`⏭️ [${options.label}] Lỗi ${errorType}, thử model tiếp theo...`);
     }
-  }
 
-  console.error(`💀 [${options.label}] Tất cả ${modelsToTry.length} model đều thất bại.`);
-  throw lastError || new Error("Tất cả models đều thất bại. Vui lòng kiểm tra API key hoặc thử lại sau.");
+    console.error(`💀 [${options.label}] Tất cả ${modelsToTry.length} model đều thất bại.`);
+    throw lastError || new Error("Tất cả models đều thất bại. Vui lòng kiểm tra API key hoặc thử lại sau.");
+  } finally {
+    // Kết thúc (thành công hoặc lỗi) => giao diện xoá thông báo chuyển model
+    emitFallbackEvent({ type: 'done', label: options.label });
+  }
 };
 
-/** Sinh nội dung đề tài (có Google Search grounding để tra nguồn thật). Trả về toàn văn kết quả. */
-export const sendMessageStream = (message: string, onChunk: (text: string) => void, model?: string, provider?: AiProvider): Promise<string> =>
-  streamWithFallback(message, onChunk, { useSearch: true, model, provider, label: 'Chat' });
+export interface StreamOptions {
+  /** Mặc định: MEDIUM cho sendMessageStream (sinh chính), LOW cho sendSinglePromptStream (phụ trợ) */
+  thinkingLevel?: ThinkingLevel;
+}
+
+/** Sinh nội dung chính của đề tài (dàn ý, chương); bật Google Search grounding với Gemini API. Trả về toàn văn. */
+export const sendMessageStream = (message: string, onChunk: (text: string) => void, model?: string, provider?: AiProvider, options: StreamOptions = {}): Promise<string> =>
+  streamWithFallback(message, onChunk, { useSearch: true, thinkingLevel: options.thinkingLevel ?? ThinkingLevel.MEDIUM, model, provider, label: 'Chat' });
 
 /**
  * Gửi prompt đơn lẻ với streaming, không dùng công cụ tìm kiếm.
- * Dùng cho phụ lục, gợi ý, chỉnh sửa văn bản, chấm chất lượng.
+ * Mặc định thinkingLevel LOW cho tác vụ phụ trợ (gợi ý, sửa văn, chấm điểm, JSON);
+ * tác vụ sinh nội dung dài (phụ lục, viết đoạn) truyền ThinkingLevel.MEDIUM.
  */
-export const sendSinglePromptStream = (message: string, onChunk: (text: string) => void, model?: string, provider?: AiProvider): Promise<string> =>
-  streamWithFallback(message, onChunk, { useSearch: false, model, provider, label: 'SinglePrompt' });
+export const sendSinglePromptStream = (message: string, onChunk: (text: string) => void, model?: string, provider?: AiProvider, options: StreamOptions = {}): Promise<string> =>
+  streamWithFallback(message, onChunk, { useSearch: false, thinkingLevel: options.thinkingLevel ?? ThinkingLevel.LOW, model, provider, label: 'SinglePrompt' });
 
 export interface ApiKeyCheckResult {
   ok: boolean;
@@ -331,7 +395,8 @@ export const validateApiKey = async (apiKey: string, provider: AiProvider, prefe
       await ai.models.generateContent({
         model,
         contents: 'Trả lời đúng một từ: OK',
-        config: { maxOutputTokens: 16 }
+        // Dùng cùng kiểu cấu hình với lúc chạy thật để phát hiện sớm model không nhận thinkingLevel
+        config: getGeminiGenerationConfig(model, { maxOutputTokens: 64 }, { provider, thinkingLevel: ThinkingLevel.LOW })
       });
       return {
         ok: true,

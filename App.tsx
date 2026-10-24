@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { UserInfo, GenerationStep, GenerationState, DocumentSections } from './types';
 import { STEPS_INFO, KHKT_CHAPTER_PROMPT, DATA_INTEGRITY_RULE, DATA_PLACEHOLDER_TAG, GEMINI_MODELS, AGENT_PLATFORM_MODELS, AiProvider, DEFAULT_GEMINI_MODEL, DEFAULT_AGENT_PLATFORM_MODEL } from './constants';
-import { initializeGeminiChat, sendMessageStream, sendSinglePromptStream, getFriendlyErrorMessage, parseApiError, PartialStreamError } from './services/geminiService';
+import { initializeGeminiChat, sendMessageStream, sendSinglePromptStream, getFriendlyErrorMessage, parseApiError, PartialStreamError, ThinkingLevel, setModelFallbackListener } from './services/geminiService';
 import { apiKeyManager } from './services/apiKeyManager';
 import { confirmDataIntegrity } from './services/integrityCheck';
 import { PageSectionKey, parsePageLimit, allocatePages } from './services/pageAllocation';
@@ -60,6 +60,12 @@ const summarizeSections = (sections: DocumentSections, steps: GenerationStep[], 
 
 // Lỗi gắn với API key => đánh dấu key và xoay sang key khác
 const KEY_LEVEL_ERRORS = new Set(['QUOTA_EXCEEDED', 'RATE_LIMIT', 'INVALID_API_KEY', 'PERMISSION_DENIED']);
+const KEY_ROTATION_REASON_TEXT: Record<string, string> = {
+  QUOTA_EXCEEDED: 'đã hết lượt sử dụng',
+  RATE_LIMIT: 'đang bị giới hạn tốc độ',
+  INVALID_API_KEY: 'không hợp lệ',
+  PERMISSION_DENIED: 'không có quyền',
+};
 
 const STEP_PAGE_KEY: Partial<Record<GenerationStep, PageSectionKey>> = {
   [GenerationStep.PHAN_MO_DAU]: 'intro',
@@ -274,6 +280,19 @@ const App: React.FC = () => {
   // Phụ lục riêng biệt
   const [appendixDocument, setAppendixDocument] = useState('');
   const [isAppendixLoading, setIsAppendixLoading] = useState(false);
+
+  // Thông báo nhẹ khi đang tự chuyển model/key; tự xoá ngay khi lần gọi AI kết thúc
+  const [fallbackNotice, setFallbackNotice] = useState<string | null>(null);
+  useEffect(() => {
+    setModelFallbackListener(event => {
+      if (event.type === 'switch') {
+        setFallbackNotice(`Đang tự động chuyển từ ${event.from} sang ${event.to} (do ${event.from} ${event.reason})...`);
+      } else {
+        setFallbackNotice(null);
+      }
+    });
+    return () => setModelFallbackListener(null);
+  }, []);
 
   // Refs luôn giữ giá trị mới nhất để các hàm async/retry không đọc state cũ trong closure
   const latest = useRef({ apiKey, provider, selectedModel, userInfo, outline, sections, state });
@@ -654,7 +673,8 @@ CHỈ viết phần được giao ở trên. Không nhắc lại các phần kh�
       let text = '';
       try {
         const send = useSearch ? sendMessageStream : sendSinglePromptStream;
-        return await send(prompt, chunk => { text += chunk; onText(text); }, model, prov);
+        // Mọi tác vụ đi qua đây đều là sinh nội dung chính (dàn ý, chương, phụ lục) => MEDIUM
+        return await send(prompt, chunk => { text += chunk; onText(text); }, model, prov, { thinkingLevel: ThinkingLevel.MEDIUM });
       } catch (error: any) {
         if (error instanceof PartialStreamError) throw error;
         const errorType = parseApiError(error);
@@ -664,6 +684,7 @@ CHỈ viết phần được giao ở trên. Không nhắc lại các phần kh�
         if (!rotation.success || !rotation.newKey || triedKeys.has(rotation.newKey)) throw error;
 
         console.log(`🔄 Tự động xoay key (${errorType}): ${rotation.message}`);
+        setFallbackNotice(`Đang tự động chuyển sang API key dự phòng (key ${apiKeyManager.maskKey(key)} ${KEY_ROTATION_REASON_TEXT[errorType] || 'gặp lỗi'})...`);
         key = rotation.newKey;
         latest.current.apiKey = key;
         setApiKey(key);
@@ -1333,6 +1354,18 @@ QUY TẮC ĐỊNH DẠNG:
               </div>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Thông báo đang chuyển model/key (tự ẩn khi AI trả lời xong) */}
+      {fallbackNotice && (
+        <div
+          role="status"
+          aria-live="polite"
+          className="fixed top-16 sm:top-4 left-1/2 -translate-x-1/2 z-[60] w-[calc(100%-2rem)] max-w-xl flex items-start gap-2 px-4 py-2.5 bg-amber-50 border border-amber-300 text-amber-900 text-sm rounded-xl shadow-lg"
+        >
+          <RefreshCw size={16} className="animate-spin mt-0.5 flex-shrink-0 text-amber-600" />
+          <span>{fallbackNotice}</span>
         </div>
       )}
 

@@ -22,7 +22,7 @@ import {
   Volume2
 } from 'lucide-react';
 import { GenerationStep, KHKTProjectInfo } from '../types';
-import { sendSinglePromptStream } from '../services/geminiService';
+import { sendSinglePromptStream, ThinkingLevel } from '../services/geminiService';
 import { AiProvider, DATA_INTEGRITY_RULE, DATA_PLACEHOLDER_TAG } from '../constants';
 
 interface AIActionPanelProps {
@@ -254,7 +254,7 @@ BẮT ĐẦU VIẾT:
       await sendSinglePromptStream(prompt, (chunk) => {
         accumulatedText += chunk;
         setGenResult(accumulatedText);
-      }, selectedModel, provider);
+      }, selectedModel, provider, { thinkingLevel: ThinkingLevel.MEDIUM }); // viết đoạn nội dung chính
       setGenTime(Math.round((Date.now() - startTime) / 100) / 10);
     } catch (err: any) {
       console.error('Lỗi khi sinh nội dung:', err);
