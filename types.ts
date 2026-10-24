@@ -54,10 +54,12 @@ export interface ChatMessage {
   text: string;
 }
 
+// Nội dung tài liệu tách theo từng bước: sinh lại một bước chỉ thay đúng phần đó, không nối trùng
+export type DocumentSections = Partial<Record<GenerationStep, string>>;
+
 export interface GenerationState {
-  step: GenerationStep;
-  messages: ChatMessage[];
-  fullDocument: string;
+  step: GenerationStep;               // Bước cuối cùng đã hoàn thành (chỉ cập nhật khi AI trả lời xong)
+  streamingStep: GenerationStep | null; // Bước đang được AI viết
   isStreaming: boolean;
   error: string | null;
 }

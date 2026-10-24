@@ -23,7 +23,7 @@ import {
 } from 'lucide-react';
 import { GenerationStep, KHKTProjectInfo } from '../types';
 import { sendSinglePromptStream } from '../services/geminiService';
-import { AiProvider } from '../constants';
+import { AiProvider, DATA_INTEGRITY_RULE, DATA_PLACEHOLDER_TAG } from '../constants';
 
 interface AIActionPanelProps {
   apiKey: string | null;
@@ -32,9 +32,42 @@ interface AIActionPanelProps {
   currentStep: GenerationStep;
   documentContent: string;
   projectInfo: KHKTProjectInfo;
-  onUpdateDocument: (newContent: string) => void;
   onInsertText: (text: string) => void;
 }
+
+// Lấy đúng đoạn tài liệu thuộc mục cần kiểm tra (theo tiêu đề), thay vì luôn lấy phần đầu tài liệu
+const SECTION_HEADING_KEYWORDS: Record<string, string[]> = {
+  'Chương 1: Cơ sở lý luận': ['CHƯƠNG 1'],
+  'Chương 2: Thực trạng': ['CHƯƠNG 2'],
+  'Chương 3: Thiết kế giải pháp / Sản phẩm': ['CHƯƠNG 3'],
+  'Chương 4: Thực nghiệm và đánh giá': ['CHƯƠNG 4'],
+  'Chương 4: Thực nghiệm & Đánh giá': ['CHƯƠNG 4'],
+  'Phần III: Kết luận': ['PHẦN III', 'KẾT LUẬN'],
+  'Tài liệu tham khảo': ['TÀI LIỆU THAM KHẢO'],
+  'Phụ lục': ['PHỤ LỤC'],
+};
+
+const extractSectionText = (document: string, sectionName: string, maxChars: number): string => {
+  if (!document) return '';
+  const keywords = (SECTION_HEADING_KEYWORDS[sectionName] || [sectionName]).map(k => k.toLocaleUpperCase('vi'));
+  const lines = document.split('\n');
+  const headingLevel = (line: string) => line.match(/^\s*(#{1,6})\s/)?.[1].length;
+  const startIdx = lines.findIndex(line => {
+    const upper = line.toLocaleUpperCase('vi');
+    const looksLikeHeading = headingLevel(line) !== undefined || /^\s*\*\*/.test(line) || /^\s*\d+(\.\d+)*\.?\s/.test(line);
+    return looksLikeHeading && keywords.some(k => upper.includes(k));
+  });
+  // Không tìm thấy tiêu đề: lấy phần cuối (thường là phần vừa viết)
+  if (startIdx === -1) return document.length > maxChars ? document.slice(-maxChars) : document;
+
+  const startLevel = headingLevel(lines[startIdx]) ?? 6;
+  let endIdx = lines.length;
+  for (let i = startIdx + 1; i < lines.length; i++) {
+    const level = headingLevel(lines[i]);
+    if (level !== undefined && level <= startLevel) { endIdx = i; break; }
+  }
+  return lines.slice(startIdx, endIdx).join('\n').slice(0, maxChars);
+};
 
 // Mẫu câu khoa học chuẩn theo lĩnh vực và chương mục
 const SAMPLE_SENTENCES_DATA = [
@@ -95,7 +128,6 @@ export const AIActionPanel: React.FC<AIActionPanelProps> = ({
   currentStep,
   documentContent,
   projectInfo,
-  onUpdateDocument,
   onInsertText
 }) => {
   const [activeTab, setActiveTab] = useState<'generate' | 'improve' | 'samples' | 'quality'>('generate');
@@ -210,7 +242,8 @@ Hãy viết nội dung cho mục: **"${genSection}"**.
 - Ý tưởng cốt lõi của người dùng cung cấp thêm: "${genPrompt || 'Viết chi tiết, đầy đủ luận cứ khoa học'}"
 - Độ dài yêu cầu: ${genLength === 'short' ? 'Ngắn (khoảng 150-250 từ)' : genLength === 'medium' ? 'Vừa phải (khoảng 300-450 từ)' : 'Dài và chi tiết (khoảng 500-800 từ)'}
 - Văn phong: ${genTone === 'academic' ? 'Học thuật, trang trọng, sử dụng thuật ngữ khoa học chuyên ngành, lập luận chặt chẽ' : 'Dễ hiểu, phổ thông, rõ ràng, tập trung vào thực tiễn'}
-- Yêu cầu chống đạo văn: Diễn đạt độc đáo, có tính thực tiễn cao, tự động chèn các số liệu thực chứng hợp lý (ví dụ phần trăm khảo sát lẻ như 82.4%, 15.6%...) để tăng độ thuyết phục.
+- Yêu cầu chống đạo văn: Diễn đạt độc đáo, gắn với bối cảnh riêng của đề tài.
+${DATA_INTEGRITY_RULE}
 - Định dạng: Sử dụng Markdown sạch sẽ. Cần viết trực tiếp nội dung phần thân, KHÔNG trả về tiêu đề lớn h1, h2 hay lời chào, lời dẫn dắt bên ngoài.
 
 BẮT ĐẦU VIẾT:
@@ -345,8 +378,13 @@ Hãy trả về đoạn văn bản đã chỉnh sửa hoàn chỉnh dưới dạ
     setQualityScore(null);
     setQualityData(null);
 
-    // Lấy đoạn văn tương ứng với bước hiện tại để kiểm tra
-    const textToCheck = documentContent || 'Chưa có nội dung văn bản để kiểm tra. Vui lòng viết nội dung đề tài trước.';
+    // Lấy đoạn văn thuộc mục đang chọn để kiểm tra
+    const textToCheck = extractSectionText(documentContent, qualitySection, 6000);
+    if (!textToCheck.trim()) {
+      setError('Chưa có nội dung để kiểm tra. Vui lòng viết nội dung đề tài trước.');
+      setIsLoading(false);
+      return;
+    }
 
     const prompt = `
 Bạn là Giám khảo chấm thi Khoa học Kỹ thuật (KHKT) cấp quốc gia.
@@ -360,8 +398,10 @@ Nhiệm vụ: Hãy phân tích chất lượng khoa học của đoạn văn b�
 
 📝 **ĐOẠN VĂN CẦN KIỂM TRA (thuộc mục "${qualitySection}"):**
 """
-${textToCheck.substring(0, 5000)}
+${textToCheck}
 """
+
+Lưu ý khi góp ý: nếu thiếu số liệu, KHÔNG đề xuất tự tạo số liệu; chỉ đề xuất học sinh thu thập dữ liệu thật (actionType "add_data_placeholder" để chèn khung bảng trống). Khung "[${DATA_PLACEHOLDER_TAG}: ...]" là chỗ chờ số liệu thật, không phải lỗi văn bản.
 
 Hãy chấm điểm chất lượng trên thang điểm 10 và trả về kết quả định dạng JSON chuẩn mực sau (TUYỆT ĐỐI KHÔNG có chữ giải thích bên ngoài, KHÔNG có markdown code block, chỉ trả về JSON nguyên bản):
 {
@@ -378,7 +418,7 @@ Hãy chấm điểm chất lượng trên thang điểm 10 và trả về kết 
     "Bố cục các luận điểm rõ ràng, đi thẳng vào vấn đề nghiên cứu"
   ],
   "improvements": [
-    { "text": "Thiếu số liệu định lượng làm minh chứng", "suggestion": "Nên đưa thêm tỷ lệ % khảo sát thực tế (ví dụ: khảo sát 150 học sinh, có 78.4% gặp khó khăn...)", "actionText": "Tự động bổ sung số liệu minh họa", "actionType": "add_statistics" },
+    { "text": "Chưa có bảng số liệu minh chứng cho nhận định về thực trạng", "suggestion": "Thu thập số liệu thật bằng phiếu khảo sát/đo đạc và trình bày thành bảng", "actionText": "Chèn khung bảng số liệu trống", "actionType": "add_data_placeholder" },
     { "text": "Câu thứ 2 trong đoạn mở đầu quá dài và lạm dụng liên từ", "suggestion": "Tách câu này thành 2 câu đơn để người đọc dễ theo dõi", "actionText": "Tự động rút gọn & tách câu", "actionType": "split_sentence" }
   ],
   "criticals": [
@@ -393,7 +433,7 @@ BẮT ĐẦU TRẢ VỀ JSON:
       let accumulatedText = '';
       await sendSinglePromptStream(prompt, (chunk) => {
         accumulatedText += chunk;
-      });
+      }, selectedModel, provider);
 
       // Parse JSON từ kết quả
       let jsonText = accumulatedText.trim();
@@ -409,38 +449,29 @@ BẮT ĐẦU TRẢ VỀ JSON:
       }
 
       const parsedData = JSON.parse(jsonText);
-      setQualityScore(parsedData.score || 7.0);
+      const score = Number(parsedData.score);
+      if (!Number.isFinite(score)) {
+        throw new SyntaxError('AI không trả về điểm số hợp lệ.');
+      }
+      setQualityScore(score);
       setQualityData({
         positives: parsedData.positives || [],
-        improvements: parsedData.improvements || [],
+        improvements: (parsedData.improvements || []).map((imp: any) =>
+          // Không bao giờ cho phép thao tác "thêm số liệu" tự sinh, kể cả khi AI vẫn trả về
+          imp?.actionType === 'add_statistics' ? { ...imp, actionType: 'add_data_placeholder', actionText: 'Chèn khung bảng số liệu trống' } : imp
+        ),
         criticals: parsedData.criticals || [],
         criteriaScores: parsedData.criteriaScores || []
       });
 
     } catch (err: any) {
       console.error('Lỗi khi kiểm tra chất lượng:', err);
-      // Fallback data khi xảy ra lỗi parse JSON để giữ trải nghiệm người dùng tốt
-      setQualityScore(7.5);
-      setQualityData({
-        criteriaScores: [
-          { name: 'Ngôn ngữ khoa học', score: 8, max: 10 },
-          { name: 'Trích dẫn nguồn', score: 7, max: 10 },
-          { name: 'Cấu trúc logic', score: 8, max: 10 },
-          { name: 'Chính tả & Ngữ pháp', score: 9, max: 10 },
-          { name: 'Tính thực tiễn/Số liệu', score: 6, max: 10 }
-        ],
-        positives: [
-          'Văn phong học thuật chuẩn mực, mạch lạc.',
-          'Các luận điểm được sắp xếp khoa học.'
-        ],
-        improvements: [
-          { text: 'Thiếu số liệu thống kê thực chứng', suggestion: 'Bổ sung kết quả khảo sát định lượng từ phiếu khảo sát học sinh.', actionText: 'Tự động thêm số liệu mẫu', actionType: 'add_statistics' },
-          { text: 'Thiếu trích dẫn tài liệu tham khảo trong nước', suggestion: 'Thêm trích dẫn các đề tài KHKT tương tự năm 2024-2025.', actionText: 'Gợi ý trích dẫn APA', actionType: 'add_citation' }
-        ],
-        criticals: [
-          'Cần nhấn mạnh rõ hơn tính cấp thiết và giải pháp sáng tạo cốt lõi của đề tài.'
-        ]
-      });
+      // Không hiển thị điểm khi chấm thất bại — điểm giả dễ khiến học sinh tin bài đã đạt
+      setQualityScore(null);
+      setQualityData(null);
+      setError(err instanceof SyntaxError
+        ? 'AI trả về kết quả không đúng định dạng nên chưa chấm được. Vui lòng bấm kiểm tra lại.'
+        : `Không thể chấm chất lượng: ${err?.message || 'lỗi kết nối AI'}`);
     } finally {
       setIsLoading(false);
     }
@@ -452,35 +483,57 @@ BẮT ĐẦU TRẢ VỀ JSON:
     setIsLoading(true);
     setError(null);
 
-    const prompt = `
+    const sectionText = extractSectionText(documentContent, qualitySection, 5000);
+    const isDataPlaceholder = actionType === 'add_data_placeholder' || actionType === 'add_statistics';
+
+    const prompt = isDataPlaceholder ? `
 Bạn là Chuyên gia KHKT.
-Nhiệm vụ: Hãy chỉnh sửa và tự động tối ưu hóa tài liệu nghiên cứu hiện tại dựa trên lỗi sau:
+Nhiệm vụ: Thiết kế KHUNG BẢNG SỐ LIỆU TRỐNG để học sinh tự điền dữ liệu thật cho mục "${qualitySection}".
+Vấn đề cần khắc phục: "${detail}"
+
+Đề tài: ${projectInfo.projectTitle}
+Phương pháp: ${projectInfo.methods}
+
+ĐOẠN VĂN LIÊN QUAN:
+"""
+${sectionText}
+"""
+
+Yêu cầu:
+- Trả về 1-2 bảng Markdown có tiêu đề bảng (Bảng x.y), đủ tiêu đề cột và đơn vị đo; MỌI ô dữ liệu ghi "…".
+- Dưới mỗi bảng thêm dòng: *[${DATA_PLACEHOLDER_TAG}: <mô tả dữ liệu cần thu thập, cách đo/khảo sát> — học sinh điền từ nhật ký thực nghiệm/phiếu khảo sát]*
+- Thêm 1 câu hướng dẫn cách nhận xét bảng sau khi có số liệu (dạng "Nếu... thì...").
+- TUYỆT ĐỐI không điền bất kỳ con số nào. Không lời giải thích ngoài các nội dung trên.
+` : `
+Bạn là Chuyên gia KHKT.
+Nhiệm vụ: Chỉnh sửa đoạn văn của mục "${qualitySection}" để khắc phục lỗi sau:
 Lỗi: "${detail}"
-Hành động cần làm: ${actionType === 'add_statistics' ? 'Tạo thêm số liệu khảo sát thực nghiệm cụ thể và chèn vào vị trí thích hợp' : 'Tách câu dài, sửa lỗi diễn đạt hoặc chèn nguồn trích dẫn APA thích hợp'}
+Hành động cần làm: ${actionType === 'add_citation' ? 'Bổ sung trích dẫn APA từ nguồn có thật (không chắc chắn nguồn thì ghi chú [CẦN BỔ SUNG NGUỒN])' : 'Tách câu dài, sửa lỗi diễn đạt, giữ nguyên nội dung khoa học'}
 
-NỘI DUNG TÀI LIỆU HIỆN TẠI:
+${DATA_INTEGRITY_RULE}
+
+ĐOẠN VĂN HIỆN TẠI:
 """
-${documentContent.substring(0, 4000)}
+${sectionText}
 """
 
-Hãy viết lại đoạn văn bị lỗi trong tài liệu và chèn các yếu tố cần thiết để khắc phục triệt để vấn đề trên.
-Hãy trả về đoạn văn bản sau khi đã tối ưu hóa, đảm bảo văn phong học thuật KHKT cao cấp. Chỉ trả về văn bản đã sửa dưới dạng markdown, không kèm lời giải thích nào.
+Hãy trả về đoạn văn sau khi đã sửa, văn phong học thuật KHKT. Chỉ trả về văn bản đã sửa dưới dạng markdown, không kèm lời giải thích nào.
 `;
 
     try {
       let result = '';
       await sendSinglePromptStream(prompt, (chunk) => {
         result += chunk;
-      });
-      
-      // Ở đây chúng ta sẽ đề xuất chèn vào cuối tài liệu hoặc hiển thị cho người dùng chèn vào
+      }, selectedModel, provider);
+
+      // Hiển thị kết quả để người dùng xem và tự chèn vào văn bản
       setGenResult(result);
       setActiveTab('generate');
-      setError('Đã tạo thành công nội dung cải tiến! Bạn có thể xem kết quả ở tab "Tạo nội dung" để sao chép hoặc chèn vào văn bản.');
+      setError('Đã tạo xong nội dung đề xuất! Xem ở tab "Tạo ý" để sao chép hoặc chèn vào phần đang viết.');
       setTimeout(() => setError(null), 5000);
     } catch (err: any) {
       console.error('Lỗi khi sửa lỗi tự động:', err);
-      setError('Không thể thực hiện sửa đổi tự động. Vui lòng tự sửa thủ công.');
+      setError(`Không thể thực hiện sửa đổi tự động: ${err?.message || 'lỗi kết nối AI'}`);
     } finally {
       setIsLoading(false);
     }

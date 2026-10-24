@@ -14,22 +14,9 @@ async function startServer() {
     const { section, userInput, projectInfo } = req.body;
     const apiKey = process.env.GEMINI_API_KEY;
 
-    const mockResponse = () => {
-      let result = '';
-      if (section === 'Lý do chọn đề tài') {
-        result = `Trong bối cảnh hiện nay, khi công nghệ ngày càng phát triển, việc ứng dụng các giải pháp số vào học tập và sinh hoạt đang trở thành xu hướng tất yếu. Qua quan sát thực tế tại môi trường học đường, chúng em nhận thấy học sinh thường gặp khó khăn trong việc tổ chức và quản lý thời gian cá nhân hiệu quả, dẫn đến căng thẳng và giảm sút kết quả học tập.
-
-Xuất phát từ thực tiễn đó, kết hợp với niềm đam mê công nghệ và mong muốn đem lại một công cụ hữu ích cho cộng đồng học sinh, chúng em quyết định chọn đề tài nghiên cứu về "${projectInfo?.title || 'Giải pháp hỗ trợ học sinh'}". Đề tài nhằm mục đích thiết kế và thử nghiệm một ứng dụng thông minh, giúp học sinh có thể lập kế hoạch và theo dõi tiến độ một cách khoa học. ${userInput ? 'Đặc biệt tập trung vào: ' + userInput : ''}`;
-      } else {
-        result = `Đây là nội dung được tạo tự động cho phần: ${section}. Với chủ đề "${projectInfo?.title}", nghiên cứu tập trung vào việc áp dụng các phương pháp luận khoa học, khảo sát thực tế và phân tích số liệu để đưa ra những kết luận khách quan nhất. Nội dung chi tiết tiếp theo sẽ làm rõ hơn giả thuyết được đặt ra và phương pháp xác minh giả thuyết đó...`;
-      }
-      return result;
-    };
-
+    // Không trả văn mẫu cố định khi thiếu key: học sinh có thể chép nhầm đoạn không liên quan vào bài
     if (!apiKey) {
-      // Simulate delay for realistic feeling
-      await new Promise(r => setTimeout(r, 1500));
-      return res.json({ content: mockResponse() });
+      return res.status(503).json({ error: 'Chưa cấu hình GEMINI_API_KEY trên server — không thể tạo nội dung.' });
     }
 
     try {
@@ -50,9 +37,9 @@ Thông tin dự án:
       const userPrompt = userInput || `Viết phần "${section}" cho đề tài trên.`;
 
       const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
+        model: 'gemini-3.6-flash',
         contents: [
-            { role: 'user', parts: [{ text: systemPrompt + '\\n\\n' + userPrompt }] }
+            { role: 'user', parts: [{ text: systemPrompt + '\n\n' + userPrompt }] }
         ],
       });
 
@@ -68,8 +55,7 @@ Thông tin dự án:
     const apiKey = process.env.GEMINI_API_KEY;
 
     if (!apiKey) {
-      await new Promise(r => setTimeout(r, 1000));
-      return res.json({ content: `[Bản đã chỉnh sửa - ${action}]: ${text}` });
+      return res.status(503).json({ error: 'Chưa cấu hình GEMINI_API_KEY trên server — không thể chỉnh sửa văn bản.' });
     }
 
     try {
@@ -85,7 +71,7 @@ Thông tin dự án:
 
       const prompt = `${actions[action] || 'Chỉnh sửa'}:\n\n"${text}"`;
       const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
+        model: 'gemini-3.6-flash',
         contents: "Bạn là biên tập viên chuyên nghiệp. " + prompt,
       });
 
@@ -96,20 +82,9 @@ Thông tin dự án:
     }
   });
 
-  app.post('/api/ai/check', async (req, res) => {
-    const { text, section } = req.body;
-    // Mock response for quality check
-    await new Promise(r => setTimeout(r, 1500));
-    const mockCheck = {
-      scores: { spelling: 8, language: 7, structure: 9, evidence: 6, sentence_length: 7 },
-      total: 7.4,
-      issues: [
-        { type: "warning", message: "Thiếu số liệu cụ thể", suggestion: "Thêm thống kê hoặc kết quả khảo sát" },
-        { type: "error", message: "Có vài lỗi chính tả nhỏ", suggestion: "Dùng công cụ kiểm tra chính tả" }
-      ],
-      strengths: ["Cấu trúc rõ ràng", "Ngôn ngữ phù hợp"]
-    };
-    res.json(mockCheck);
+  app.post('/api/ai/check', async (_req, res) => {
+    // Chưa có bộ chấm thật: trả lỗi rõ ràng thay vì điểm giả cố định (trước đây mọi bài đều nhận 7.4)
+    res.status(501).json({ error: 'Chức năng kiểm tra chất lượng chưa được triển khai trên server.' });
   });
 
   // Vite middleware for development

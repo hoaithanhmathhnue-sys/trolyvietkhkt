@@ -522,9 +522,13 @@ Yêu cầu chung:
 
   const clearRefDocuments = () => { onChange('referenceDocuments', ''); setRefFileNames([]); try { sessionStorage.removeItem('khkt_ref_file_names'); } catch {} };
 
-  const requiredFields: (keyof UserInfo)[] = ['projectTitle', 'field', 'school', 'location', 'problem', 'objectives', 'hypothesis', 'methods'];
+  // Khớp với các trường có dấu * trên giao diện
+  const requiredFields: (keyof UserInfo)[] = ['projectTitle', 'field', 'level', 'members', 'advisor', 'school', 'location', 'problem', 'objectives', 'hypothesis', 'methods'];
   const isInfoValid = requiredFields.every(k => { const v = userInfo[k]; return typeof v === 'string' && v.trim() !== ''; });
-  const isManualValid = manualContent.trim().length > 50;
+  const MIN_MANUAL_OUTLINE_CHARS = 200;
+  const isManualValid = manualContent.trim().length >= MIN_MANUAL_OUTLINE_CHARS;
+  const pageLimitValue = userInfo.pageLimit === '' ? null : Number(userInfo.pageLimit);
+  const isPageLimitInvalid = pageLimitValue !== null && (!Number.isFinite(pageLimitValue) || pageLimitValue < 5);
 
   // Filtered fields
   const displayFields = selectedGroup ? KHKT_FIELDS.filter(f => f.group === selectedGroup) : KHKT_FIELDS;
@@ -729,6 +733,9 @@ Yêu cầu chung:
                   <InputWithHistory type="number" name="pageLimit" value={userInfo.pageLimit} onChange={handleChange} min={15} max={100}
                     className="bg-white focus:ring-teal-500 focus:border-teal-500 block w-full pl-10 text-sm border-gray-300 rounded-md p-3 border text-gray-900 placeholder-gray-500"
                     placeholder="VD: 30 (để trống = không giới hạn)" />
+                  {isPageLimitInvalid && (
+                    <p className="text-xs text-red-500 mt-1">Số trang không hợp lệ (tối thiểu 5) — giới hạn trang sẽ không được áp dụng.</p>
+                  )}
                 </InputGroup>
               </div>
             </div>
@@ -787,14 +794,17 @@ Yêu cầu chung:
         ) : (
           /* MANUAL MODE */
           <div className="space-y-4">
-            <p className="text-sm text-gray-600">Dán nội dung đề tài KHKT đã viết sẵn để AI xử lý và định dạng:</p>
+            <p className="text-sm text-gray-600">Dán dàn ý đề tài KHKT đã có sẵn. Dàn ý này sẽ được dùng làm DÀN Ý CHÍNH THỨC để AI viết từng phần:</p>
             <textarea value={manualContent} onChange={e => setManualContent(e.target.value)} rows={15}
               className="w-full border border-gray-300 rounded-lg p-4 text-sm focus:ring-teal-500 focus:border-teal-500"
-              placeholder="Dán toàn bộ nội dung đề tài KHKT vào đây..." />
+              placeholder="Dán dàn ý đề tài KHKT (Phần I, Chương 1-4, Kết luận...) vào đây..." />
             <Button onClick={() => onManualSubmit(manualContent)} disabled={isSubmitting || !isManualValid}
               className="w-full bg-gradient-to-r from-teal-600 to-emerald-600 text-white font-bold py-4 text-lg rounded-xl disabled:opacity-50">
               {isSubmitting ? 'Đang xử lý...' : '📄 Gửi nội dung để xử lý'}
             </Button>
+            {!isManualValid && manualContent.trim().length > 0 && (
+              <p className="text-center text-sm text-red-500">Dàn ý cần ít nhất {MIN_MANUAL_OUTLINE_CHARS} ký tự (hiện có {manualContent.trim().length}).</p>
+            )}
           </div>
         )}
       </div>

@@ -61,10 +61,22 @@ function parseInlineFormatting(text: string): TextRun[] {
   return runs;
 }
 
+const isTableRow = (line: string) => /^\|.*\|$/.test(line);
+const isTableSeparator = (line: string) => /^\|?(\s*:?-{2,}:?\s*\|)+\s*(:?-{2,}:?\s*)?\|?$/.test(line);
+
+// Tách ô theo "|" nhưng GIỮ ô rỗng để dữ liệu không bị dồn cột; hỗ trợ "\|" trong ô
+function splitTableRow(line: string): string[] {
+  return line
+    .replace(/^\|/, '')
+    .replace(/\|$/, '')
+    .split(/(?<!\\)\|/)
+    .map(cell => cell.trim().replace(/\\\|/g, '|'));
+}
+
 /**
  * Parse Markdown thành các elements
  */
-function parseMarkdown(markdown: string): ParsedElement[] {
+export function parseMarkdown(markdown: string): ParsedElement[] {
   const lines = markdown.split('\n');
   const elements: ParsedElement[] = [];
   let i = 0;
@@ -112,15 +124,14 @@ function parseMarkdown(markdown: string): ParsedElement[] {
       continue;
     }
 
-    // Table
-    if (line.includes('|')) {
+    // Table: chỉ nhận dòng dạng | ... | và phải có ít nhất 2 dòng liên tiếp (tiêu đề + phân cách/dữ liệu),
+    // để câu văn có ký tự "|" không bị biến thành bảng
+    if (isTableRow(line) && i + 1 < lines.length && isTableRow(lines[i + 1].trim())) {
       const rows: string[][] = [];
-      while (i < lines.length && lines[i].includes('|')) {
-        const row = lines[i].split('|')
-          .map(cell => cell.trim())
-          .filter(cell => cell && !cell.match(/^[-:]+$/));
-        if (row.length > 0) {
-          rows.push(row);
+      while (i < lines.length && isTableRow(lines[i].trim())) {
+        const rowLine = lines[i].trim();
+        if (!isTableSeparator(rowLine)) {
+          rows.push(splitTableRow(rowLine));
         }
         i++;
       }
@@ -268,7 +279,7 @@ function elementsToDocxChildren(elements: ParsedElement[], numberingConfig: any[
 /**
  * Lọc bỏ các lệnh điều hướng và hướng dẫn của AI khỏi nội dung xuất Word.
  */
-function cleanMarkdownForExport(markdown: string): string {
+export function cleanMarkdownForExport(markdown: string): string {
   if (!markdown) return markdown;
 
   let cleaned = markdown;
@@ -287,7 +298,8 @@ function cleanMarkdownForExport(markdown: string): string {
   //    VD: "• Bước 7: Viết Giải pháp 4 (🔵 Đang thực hiện)"
   //    VD: "• Bước 6: Viết GP 2 & 3 (🔵 Đang thực hiện - Viết GP 3)"
   //    VD: "• Bước 8: Viết Phần V, VI & Phụ lục (Đợi lệnh)"
-  cleaned = cleaned.replace(/^[^\n]*Bước\s+\d+[^\n]*(?:Đang thực hiện|Chờ lệnh|Đợi lệnh|CHỜ LỆNH|ĐANG THỰC HIỆN|Hoàn thành|🔵)[^\n]*$/gm, '');
+  //    Chỉ xoá khi trạng thái nằm trong ngoặc hoặc có 🔵 — câu thật như "Bước 3: Hoàn thành thí nghiệm..." được giữ
+  cleaned = cleaned.replace(/^[^\n]*Bước\s+\d+[^\n]*(?:\((?:🔵\s*)?(?:Đang thực hiện|Chờ lệnh|Đợi lệnh|Hoàn thành)[^)\n]*\)|🔵)[^\n]*$/gimu, '');
 
   // 3b. Dòng sót chứa trạng thái bước bị tách dòng
   cleaned = cleaned.replace(/^[^\n]*\(Đang thực hiện[^)]*\)[^\n]*$/gm, '');
@@ -323,7 +335,7 @@ function cleanMarkdownForExport(markdown: string): string {
   cleaned = cleaned.replace(/^[^\n]*BẮT ĐẦU phản hồi bằng MENU NAVIGATION[^\n]*$/gm, '');
 
   // 11. Emoji rác đơn lẻ đầu dòng
-  cleaned = cleaned.replace(/^\s*[📱🔵]\s*$/gm, '');
+  cleaned = cleaned.replace(/^\s*[📱🔵]\s*$/gmu, '');
 
   // 12. Các pattern AI phổ biến khác đứng riêng một dòng
   cleaned = cleaned.replace(/^[^\n]*(?:Tôi sẽ tiếp tục|Tôi sẽ triển khai tiếp)[^\n]*$/gm, '');
@@ -349,7 +361,8 @@ function cleanMarkdownForExport(markdown: string): string {
   cleaned = cleaned.replace(/^Danh sách này bao gồm[^\n]*$/gm, '');
 
   // 19. Emoji trang trí đơn lẻ đầu dòng (📎📋⚠️) kèm text metadata
-  cleaned = cleaned.replace(/^[^\n]*[📎⚠️]\s*(?:QUAN TRỌNG|LƯU Ý|CHỈ VIẾT)[^\n]*$/gm, '');
+  //     Chỉ áp dụng cho dòng BẮT ĐẦU bằng emoji (metadata của AI), không xoá câu "Lưu ý" trong nội dung
+  cleaned = cleaned.replace(/^\s*(?:📎|⚠️?)\s*\**\s*(?:QUAN TRỌNG|LƯU Ý|CHỈ VIẾT)[^\n]*$/gmu, '');
 
   // 20. Dọn dẹp khoảng trắng thừa: 3+ dòng trống → 2 dòng trống
   cleaned = cleaned.replace(/\n{3,}/g, '\n\n').trim();

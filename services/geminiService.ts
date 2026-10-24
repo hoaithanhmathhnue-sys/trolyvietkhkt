@@ -1,7 +1,6 @@
-import { GoogleGenAI, Chat } from "@google/genai";
+import { GoogleGenAI } from "@google/genai";
 import {
   SYSTEM_INSTRUCTION,
-  FALLBACK_MODELS,
   GEMINI_FALLBACK_MODELS,
   AGENT_PLATFORM_FALLBACK_MODELS,
   DEFAULT_GEMINI_MODEL,
@@ -9,73 +8,72 @@ import {
   AiProvider
 } from "../constants";
 import { TitleAnalysisResult } from '../types';
+import { apiKeyManager } from './apiKeyManager';
 
 export const createGoogleAiClient = (apiKey: string, provider: AiProvider = 'gemini'): GoogleGenAI => {
   if (provider === 'agent-platform') {
+    // Agent Platform (Vertex AI) express mode: chỉ cần API key, SDK tự dùng endpoint global
     return new GoogleGenAI({ vertexai: true, apiKey });
   }
   return new GoogleGenAI({ apiKey });
 };
 
+const isLegacyGemini2 = (model: string) => model.startsWith('gemini-2');
+
 export const getGeminiGenerationConfig = (model: string, extraConfig: any = {}) => {
-  const isNewGeminiModel = model.startsWith('gemini-3');
   const config = { ...extraConfig };
-  
-  if (!isNewGeminiModel) {
-    config.temperature = 0.7;
+
+  // Gemini 3+ (kể cả gemini-flash-latest): Google khuyến nghị giữ temperature mặc định,
+  // hạ thấp dễ gây lặp vòng khi suy luận. Chỉ chỉnh cho dòng 2.x.
+  if (isLegacyGemini2(model)) {
+    config.temperature = 0.5;
     config.topK = 64;
     config.topP = 0.95;
+  } else {
+    // thinkingBudget là tham số kiểu cũ; để model 3.x tự quyết mức suy luận
+    delete config.thinkingConfig;
   }
   return config;
 };
 
-// Hàm phân tích và trả về thông báo lỗi thân thiện
+// Lấy mã HTTP từ lỗi của SDK (ApiError có .status), rồi mới dò trong message
+const getErrorStatusCode = (error: any): number | undefined => {
+  if (typeof error?.status === 'number') return error.status;
+  if (typeof error?.code === 'number') return error.code;
+  const msg = String(error?.message || '');
+  const match = msg.match(/"code"\s*:\s*(\d{3})/) || msg.match(/got status:\s*(\d{3})/i) || msg.match(/^\s*\[?(\d{3})\b/);
+  return match ? Number(match[1]) : undefined;
+};
+
+// Phân loại lỗi API. Kiểm tra lỗi key trước, vì Google trả key sai dưới dạng 400 INVALID_ARGUMENT.
 export const parseApiError = (error: any): string => {
-  const errorMessage = error?.message || error?.toString() || '';
-  const errorString = JSON.stringify(error);
+  const errorMessage = typeof error === 'string' ? error : String(error?.message || error || '');
+  const status = getErrorStatusCode(error);
 
-  if (errorString.includes('400') || errorMessage.includes('INVALID_ARGUMENT')) {
-    return 'INVALID_ARGUMENT';
-  }
-  if (errorString.includes('404') || errorMessage.includes('NOT_FOUND')) {
-    return 'NOT_FOUND';
-  }
-  if (errorString.includes('500') || errorString.includes('503') || errorString.includes('504') || 
-      errorMessage.includes('INTERNAL') || errorMessage.includes('UNAVAILABLE') || errorMessage.includes('DEADLINE_EXCEEDED')) {
-    return 'SERVER_ERROR';
-  }
-
-  // Kiểm tra lỗi quota exceeded (429) / rate limit / overloaded
-  if (errorString.includes('429') ||
-    errorMessage.includes('quota') ||
-    errorMessage.includes('RESOURCE_EXHAUSTED') ||
-    errorMessage.includes('exceeded') ||
-    errorMessage.includes('overloaded') ||
-    errorMessage.includes('high demand') ||
-    errorMessage.includes('temporarily unavailable')) {
-    return 'QUOTA_EXCEEDED';
-  }
-
-  if (errorMessage.includes('rate') || errorMessage.includes('limit')) {
-    return 'RATE_LIMIT';
-  }
-
-  // Kiểm tra lỗi API key không hợp lệ
-  if (errorMessage.includes('API_KEY_INVALID') ||
-    errorMessage.includes('401') ||
-    errorMessage.includes('unauthorized') ||
-    errorMessage.includes('PERMISSION_DENIED') ||
-    errorMessage.includes('403')) {
+  if (/API_KEY_INVALID|API key not valid|API_KEY_EXPIRED|API key expired|invalid api key|API key not found/i.test(errorMessage)) {
     return 'INVALID_API_KEY';
   }
-
-  // Kiểm tra lỗi kết nối
-  if (errorMessage.includes('network') ||
-    errorMessage.includes('fetch') ||
-    errorMessage.includes('connection')) {
+  if (status === 401 || /UNAUTHENTICATED/.test(errorMessage)) {
+    return 'INVALID_API_KEY';
+  }
+  if (status === 429 || /RESOURCE_EXHAUSTED|quota/i.test(errorMessage)) {
+    return /per minute|rate limit|PerMinute/i.test(errorMessage) ? 'RATE_LIMIT' : 'QUOTA_EXCEEDED';
+  }
+  if (status === 403 || /PERMISSION_DENIED/.test(errorMessage)) {
+    return 'PERMISSION_DENIED';
+  }
+  if (status === 404 || /NOT_FOUND|is not found|not supported for generateContent/i.test(errorMessage)) {
+    return 'NOT_FOUND';
+  }
+  if ((status !== undefined && status >= 500) || /INTERNAL|UNAVAILABLE|DEADLINE_EXCEEDED|overloaded|high demand|temporarily unavailable/i.test(errorMessage)) {
+    return 'SERVER_ERROR';
+  }
+  if (status === 400 || /INVALID_ARGUMENT/.test(errorMessage)) {
+    return 'INVALID_ARGUMENT';
+  }
+  if (/Failed to fetch|NetworkError|network|ERR_|connection/i.test(errorMessage)) {
     return 'NETWORK_ERROR';
   }
-
   return 'UNKNOWN';
 };
 
@@ -88,11 +86,11 @@ export const getFriendlyErrorMessage = (error: any): { type: string; title: stri
       return {
         type: 'quota',
         title: '⚠️ Đã vượt quá giới hạn sử dụng',
-        message: 'Bạn đã sử dụng hết lượt gọi API miễn phí trong ngày. Đây là giới hạn từ phía nhà cung cấp, không phải lỗi của ứng dụng.',
+        message: 'API key đã dùng hết hạn mức (quota) cho các model đã thử. Đây là giới hạn từ phía Google, không phải lỗi của ứng dụng.',
         suggestions: [
-          '🔑 Lấy API Key từ tài khoản khác hoặc chuyển đổi giữa Google Gemini API và Agent Platform API trong Cài đặt',
-          '⏰ Hoặc đợi đến ngày hôm sau khi quota được reset (thường reset lúc 0h theo giờ PST)',
-          '💡 Mẹo: Mỗi tài khoản đều có quota riêng, bạn có thể nhập API key riêng để có thêm lượt sử dụng'
+          '🔑 Thêm API Key từ tài khoản khác hoặc chuyển đổi giữa Google Gemini API và Agent Platform API trong Cài đặt',
+          '⏰ Hoặc đợi quota được reset (thường lúc 0h theo giờ PST, tức 14h–15h giờ Việt Nam)',
+          '💡 Mỗi tài khoản có quota riêng, bạn có thể nhập API key riêng để có thêm lượt sử dụng'
         ]
       };
 
@@ -100,7 +98,7 @@ export const getFriendlyErrorMessage = (error: any): { type: string; title: stri
       return {
         type: 'rate_limit',
         title: '🚦 Đang gửi yêu cầu quá nhanh',
-        message: 'Bạn đang gửi quá nhiều yêu cầu trong thời gian ngắn. Hãy chờ một chút rồi thử lại.',
+        message: 'Vượt giới hạn số yêu cầu mỗi phút. Hãy chờ một chút rồi thử lại.',
         suggestions: [
           '⏳ Đợi 30-60 giây rồi thử lại',
           '🔄 Không bấm nút nhiều lần liên tiếp'
@@ -110,12 +108,24 @@ export const getFriendlyErrorMessage = (error: any): { type: string; title: stri
     case 'INVALID_API_KEY':
       return {
         type: 'auth',
-        title: '🔐 API Key không hợp lệ hoặc thiếu quyền',
-        message: 'API Key bạn đang sử dụng không đúng, đã hết hạn hoặc không có quyền truy cập model đã chọn.',
+        title: '🔐 API Key không hợp lệ',
+        message: 'Google từ chối API Key này (sai, đã bị xoá/thu hồi hoặc hết hạn).',
         suggestions: [
-          '🔑 Kiểm tra lại API Key đã nhập trong Cài đặt',
-          '🔄 Đảm bảo bạn đã chọn đúng Nhà cung cấp AI (Google Gemini hay Agent Platform)',
-          '📋 Đảm bảo copy đầy đủ API Key (không thừa/thiếu ký tự)'
+          '🔑 Mở Cài đặt, dán lại API Key và bấm "Kiểm tra key"',
+          '🔄 Key AI Studio (AIza...) dùng cho "Google Gemini"; key Agent Platform (AQ...) dùng cho "Agent Platform"',
+          '📋 Đảm bảo copy đầy đủ API Key (không thừa/thiếu ký tự, không có dấu cách)'
+        ]
+      };
+
+    case 'PERMISSION_DENIED':
+      return {
+        type: 'permission',
+        title: '🚫 API Key không có quyền dùng model/dịch vụ này',
+        message: 'Key hợp lệ nhưng bị từ chối quyền truy cập (403). Thường do key bị giới hạn theo website/IP, dự án chưa bật Generative Language API, hoặc model không mở cho tài khoản này.',
+        suggestions: [
+          '🌐 Trong Google Cloud Console → Credentials, bỏ hoặc sửa "Application restrictions" để cho phép trang web này',
+          '🧩 Bật "Generative Language API" (Gemini) hoặc "Vertex AI API" (Agent Platform) cho dự án của key',
+          '🔄 Chọn model khác trong Cài đặt (dòng 2.5 đã bị Google giới hạn cho tài khoản mới)'
         ]
       };
 
@@ -127,16 +137,16 @@ export const getFriendlyErrorMessage = (error: any): { type: string; title: stri
         suggestions: [
           '📶 Kiểm tra kết nối WiFi/Internet',
           '🔄 Thử làm mới trang (F5)',
-          '🌍 Thử sử dụng mạng khác'
+          '🌍 Thử sử dụng mạng khác (một số mạng trường học chặn googleapis.com)'
         ]
       };
 
     case 'INVALID_ARGUMENT':
       return {
         type: 'invalid_argument',
-        title: '❌ Lỗi tham số (400)',
-        message: 'Có lỗi trong cấu hình tham số gửi đến AI. Vui lòng kiểm tra lại.',
-        suggestions: ['🔄 Thử làm mới trang và thực hiện lại']
+        title: '❌ Yêu cầu không hợp lệ (400)',
+        message: 'Máy chủ AI từ chối tham số của yêu cầu (có thể do nội dung quá dài hoặc model không hỗ trợ cấu hình).',
+        suggestions: ['🔄 Đổi sang model khác trong Cài đặt rồi thử lại', '✂️ Rút bớt tài liệu tham khảo nếu đã tải lên rất nhiều']
       };
 
     case 'NOT_FOUND':
@@ -144,22 +154,22 @@ export const getFriendlyErrorMessage = (error: any): { type: string; title: stri
         type: 'not_found',
         title: '❌ Không tìm thấy model (404)',
         message: 'Model AI đang được gọi không tồn tại hoặc không khả dụng trên Provider hiện tại.',
-        suggestions: ['🔄 Đổi sang model khác trong phần Cài đặt']
+        suggestions: ['🔄 Đổi sang model khác trong phần Cài đặt và bấm "Kiểm tra key"']
       };
 
     case 'SERVER_ERROR':
       return {
         type: 'server_error',
-        title: '🌐 Lỗi máy chủ (500/503)',
-        message: 'Máy chủ AI đang gặp sự cố. Hệ thống sẽ tự động thử model khác.',
-        suggestions: ['⏰ Đợi một lúc rồi thử lại']
+        title: '🌐 Máy chủ AI đang quá tải (5xx)',
+        message: 'Máy chủ AI đang gặp sự cố hoặc quá tải. Hệ thống đã thử các model dự phòng.',
+        suggestions: ['⏰ Đợi 1-2 phút rồi bấm "Thử lại"']
       };
 
     default:
       return {
         type: 'unknown',
         title: '❌ Đã xảy ra lỗi',
-        message: error?.message || 'Có lỗi không xác định xảy ra khi gọi AI.',
+        message: (typeof error === 'string' ? error : error?.message) || 'Có lỗi không xác định xảy ra khi gọi AI.',
         suggestions: [
           '🔄 Thử làm mới trang và thực hiện lại',
           '🔑 Kiểm tra API Key và Provider',
@@ -169,51 +179,37 @@ export const getFriendlyErrorMessage = (error: any): { type: string; title: stri
   }
 };
 
-let chatSession: Chat | null = null;
+// ═══════════════════════════════════════════════════════════
+// Cấu hình phiên gọi AI
+// Mỗi lần gọi là một prompt TỰ CHỨA (không gửi kèm lịch sử chat):
+// prompt luôn mang theo dàn ý đã chốt, nên đổi key/model/khôi phục phiên không làm AI "mất trí nhớ",
+// và request không phình to theo số chương.
+// ═══════════════════════════════════════════════════════════
 let currentApiKey: string | null = null;
 let currentSelectedModel: string | null = null;
-let currentProvider: AiProvider = 'gemini';
-let history: any[] = []; // Store history to restore when switching models
+let currentProvider: AiProvider | null = null;
 
-export const initializeGeminiChat = (apiKey: string, selectedModel?: string, provider: AiProvider = 'gemini') => {
+export const initializeGeminiChat = (apiKey: string, selectedModel?: string, provider?: AiProvider) => {
+  const activeProvider = provider || apiKeyManager.getProvider();
   currentApiKey = apiKey;
-  currentProvider = provider;
-  currentSelectedModel = selectedModel || (provider === 'agent-platform' ? DEFAULT_AGENT_PLATFORM_MODEL : DEFAULT_GEMINI_MODEL);
-  chatSession = null;
-  history = []; // Reset history on new initialization
+  currentProvider = activeProvider;
+  currentSelectedModel = selectedModel || (activeProvider === 'agent-platform' ? DEFAULT_AGENT_PLATFORM_MODEL : DEFAULT_GEMINI_MODEL);
 };
 
-// Lấy lịch sử chat để lưu phiên làm việc
-export const getChatHistory = (): any[] => {
-  return [...history];
-};
-
-// Khôi phục lịch sử chat từ phiên đã lưu
-export const setChatHistory = (savedHistory: any[]) => {
-  history = savedHistory || [];
-};
-
-const createChatSession = (model: string) => {
-  if (!currentApiKey) throw new Error("API Key not found");
-
-  const ai = createGoogleAiClient(currentApiKey, currentProvider);
-
-  return ai.chats.create({
-    model: model,
-    config: getGeminiGenerationConfig(model, {
-      systemInstruction: SYSTEM_INSTRUCTION,
-      maxOutputTokens: 65536,
-      thinkingConfig: { thinkingBudget: 2048 },
-      tools: [{ googleSearch: {} }]
-    }),
-    history: history
-  });
+const resolveCallConfig = (model?: string, provider?: AiProvider) => {
+  const activeProvider = provider || currentProvider || apiKeyManager.getProvider();
+  const apiKey = (activeProvider === currentProvider && currentApiKey) || apiKeyManager.getActiveKey(activeProvider);
+  if (!apiKey) {
+    throw new Error("Không có API Key. Vui lòng nhập API key trong phần Cài đặt.");
+  }
+  const selectedModel = model || currentSelectedModel || (activeProvider === 'agent-platform' ? DEFAULT_AGENT_PLATFORM_MODEL : DEFAULT_GEMINI_MODEL);
+  return { apiKey, provider: activeProvider, selectedModel };
 };
 
 // Sắp xếp models với model được chọn đầu tiên
-const getOrderedModels = (): string[] => {
-  const fallbackList = currentProvider === 'agent-platform' ? AGENT_PLATFORM_FALLBACK_MODELS : GEMINI_FALLBACK_MODELS;
-  const orderedModels: string[] = currentSelectedModel ? [currentSelectedModel] : [];
+const getOrderedModels = (selectedModel: string, provider: AiProvider): string[] => {
+  const fallbackList = provider === 'agent-platform' ? AGENT_PLATFORM_FALLBACK_MODELS : GEMINI_FALLBACK_MODELS;
+  const orderedModels: string[] = [selectedModel];
   for (const model of fallbackList) {
     if (!orderedModels.includes(model)) {
       orderedModels.push(model);
@@ -222,122 +218,56 @@ const getOrderedModels = (): string[] => {
   return orderedModels;
 };
 
+// Lỗi gắn với model (không phải với key/mạng) => thử model kế tiếp
+const FALLBACK_ERROR_TYPES = new Set(['QUOTA_EXCEEDED', 'RATE_LIMIT', 'NOT_FOUND', 'SERVER_ERROR', 'PERMISSION_DENIED', 'INVALID_ARGUMENT']);
+
 /** Loại bỏ HTML tags không mong muốn từ AI output, chuyển <br> thành newlines */
 const sanitizeAIOutput = (text: string): string => {
   let clean = text;
-  // Chuyển <br>, <br/>, <br /> thành newline
   clean = clean.replace(/<br\s*\/?>/gi, '\n');
-  // Loại bỏ các HTML tags phổ biến khác (giữ nội dung bên trong)
   clean = clean.replace(/<\/?(p|div|span|b|i|em|strong|u|s|del|ins|mark|sub|sup|small|big|center)(\s[^>]*)?>/gi, '');
   return clean;
 };
 
-export const sendMessageStream = async (message: string, onChunk: (text: string) => void) => {
-  // Sử dụng API key từ localStorage (đã được khởi tạo qua initializeGeminiChat)
-  if (!currentApiKey) {
-    throw new Error("Không có API Key. Vui lòng nhập API key trong phần Cài đặt.");
+/** Lỗi xảy ra khi model đã trả về một phần nội dung — không thể chuyển model mà không lặp nội dung */
+export class PartialStreamError extends Error {
+  partialText: string;
+  cause: any;
+  constructor(cause: any, partialText: string) {
+    super(cause?.message || String(cause));
+    this.name = 'PartialStreamError';
+    this.partialText = partialText;
+    this.cause = cause;
+    (this as any).status = cause?.status;
   }
+}
 
+const streamWithFallback = async (
+  message: string,
+  onChunk: (text: string) => void,
+  options: { useSearch: boolean; model?: string; provider?: AiProvider; label: string }
+): Promise<string> => {
+  const { apiKey, provider, selectedModel } = resolveCallConfig(options.model, options.provider);
+  const modelsToTry = getOrderedModels(selectedModel, provider);
   let lastError: any = null;
-  const modelsToTry = getOrderedModels();
 
-  console.log(`🚀 Bắt đầu gửi tin nhắn (${currentProvider}). Sẽ thử ${modelsToTry.length} model theo thứ tự: ${modelsToTry.join(' → ')}`);
+  console.log(`🚀 [${options.label}] (${provider}) thử ${modelsToTry.length} model: ${modelsToTry.join(' → ')}`);
 
-  // Thử lần lượt các model theo thứ tự fallback
   for (const model of modelsToTry) {
+    let fullResponse = "";
     try {
-      console.log(`🤖 Đang thử model: ${model} (${currentProvider})`);
-
-      // Tạo session với model hiện tại
-      const ai = createGoogleAiClient(currentApiKey, currentProvider);
-      chatSession = ai.chats.create({
-        model: model,
+      const ai = createGoogleAiClient(apiKey, provider);
+      const response = await ai.models.generateContentStream({
+        model,
+        contents: [{ role: 'user', parts: [{ text: message }] }],
         config: getGeminiGenerationConfig(model, {
           systemInstruction: SYSTEM_INSTRUCTION,
           maxOutputTokens: 65536,
           thinkingConfig: { thinkingBudget: 2048 },
-          tools: [{ googleSearch: {} }]
-        }),
-        history: history
+          ...(options.useSearch ? { tools: [{ googleSearch: {} }] } : {})
+        })
       });
 
-      const responseStream = await chatSession.sendMessageStream({ message });
-
-      let fullResponse = "";
-      for await (const chunk of responseStream) {
-        if (chunk.text) {
-          const cleanText = sanitizeAIOutput(chunk.text);
-          onChunk(cleanText);
-          fullResponse += cleanText;
-        }
-      }
-
-      // Thành công - cập nhật history và return
-      history.push({ role: 'user', parts: [{ text: message }] });
-      history.push({ role: 'model', parts: [{ text: fullResponse }] });
-      console.log(`✅ Thành công với model ${model}`);
-      return;
-
-    } catch (error: any) {
-      console.error(`❌ Model ${model} thất bại:`, error.message || error);
-      lastError = error;
-
-      const errorType = parseApiError(error);
-      
-      let allowFallback = false;
-      if (errorType === 'QUOTA_EXCEEDED' || errorType === 'RATE_LIMIT' || errorType === 'NOT_FOUND' || errorType === 'SERVER_ERROR') {
-        allowFallback = true;
-      } else if (currentProvider === 'agent-platform' && (errorType === 'INVALID_API_KEY' || error?.status === 403 || error?.message?.includes('PERMISSION_DENIED'))) {
-        allowFallback = true;
-      }
-      
-      if (!allowFallback) {
-         console.error(`🛑 Lỗi nghiêm trọng (${errorType}), không fallback. Dừng ngay lập tức.`);
-         throw error;
-      }
-      
-      console.log(`⏭️ Lỗi ${errorType}, thử model tiếp theo...`);
-
-      // Tiếp tục thử model tiếp theo
-      continue;
-    }
-  }
-
-  // Tất cả models đều thất bại
-  console.error(`💀 Tất cả ${modelsToTry.length} models đều thất bại.`);
-  throw lastError || new Error("Tất cả models đều thất bại. Vui lòng kiểm tra API key hoặc thử lại sau.");
-};
-
-/**
- * Gửi prompt đơn lẻ với streaming - KHÔNG dùng chat session hay history.
- * Mỗi lần gọi hoàn toàn độc lập, tránh context window bị đầy.
- * Dùng cho phụ lục và các tác vụ cần prompt lớn mà không cần ngữ cảnh hội thoại.
- */
-export const sendSinglePromptStream = async (message: string, onChunk: (text: string) => void): Promise<string> => {
-  if (!currentApiKey) {
-    throw new Error("Không có API Key. Vui lòng nhập API key trong phần Cài đặt.");
-  }
-
-  let lastError: any = null;
-  const modelsToTry = getOrderedModels();
-
-  console.log(`🚀 [SinglePrompt] Bắt đầu (${currentProvider}). Thử ${modelsToTry.length} model: ${modelsToTry.join(' → ')}`);
-
-  for (const model of modelsToTry) {
-    try {
-      console.log(`🤖 [SinglePrompt] Đang thử model: ${model}`);
-
-      const ai = createGoogleAiClient(currentApiKey, currentProvider);
-      const response = await ai.models.generateContentStream({
-        model: model,
-        config: getGeminiGenerationConfig(model, {
-          systemInstruction: SYSTEM_INSTRUCTION,
-          maxOutputTokens: 65536,
-        }),
-        contents: [{ role: 'user', parts: [{ text: message }] }]
-      });
-
-      let fullResponse = "";
       for await (const chunk of response) {
         if (chunk.text) {
           const cleanText = sanitizeAIOutput(chunk.text);
@@ -346,32 +276,84 @@ export const sendSinglePromptStream = async (message: string, onChunk: (text: st
         }
       }
 
-      console.log(`✅ [SinglePrompt] Thành công với model ${model}, ${fullResponse.length} chars`);
+      console.log(`✅ [${options.label}] Thành công với model ${model}, ${fullResponse.length} ký tự`);
       return fullResponse;
-
     } catch (error: any) {
-      console.error(`❌ [SinglePrompt] Model ${model} thất bại:`, error.message || error);
+      console.error(`❌ [${options.label}] Model ${model} thất bại:`, error?.message || error);
       lastError = error;
-      
-      const errorType = parseApiError(error);
-      let allowFallback = false;
-      if (errorType === 'QUOTA_EXCEEDED' || errorType === 'RATE_LIMIT' || errorType === 'NOT_FOUND' || errorType === 'SERVER_ERROR') {
-        allowFallback = true;
-      } else if (currentProvider === 'agent-platform' && (errorType === 'INVALID_API_KEY' || error?.status === 403 || error?.message?.includes('PERMISSION_DENIED'))) {
-        allowFallback = true;
+
+      // Đã stream ra một phần: chuyển model sẽ viết lại từ đầu và nhân đôi nội dung => dừng, giữ phần đã có
+      if (fullResponse.length > 0) {
+        throw new PartialStreamError(error, fullResponse);
       }
 
-      if (!allowFallback) {
-         console.error(`🛑 [SinglePrompt] Lỗi nghiêm trọng (${errorType}), không fallback. Dừng ngay lập tức.`);
-         throw error;
+      const errorType = parseApiError(error);
+      if (!FALLBACK_ERROR_TYPES.has(errorType)) {
+        console.error(`🛑 [${options.label}] Lỗi ${errorType}, không thử model khác.`);
+        throw error;
       }
-      continue;
+      console.log(`⏭️ [${options.label}] Lỗi ${errorType}, thử model tiếp theo...`);
     }
   }
 
-  console.error(`💀 [SinglePrompt] Tất cả models đều thất bại.`);
-  throw lastError || new Error("Tất cả models đều thất bại. Vui lòng thử lại sau.");
+  console.error(`💀 [${options.label}] Tất cả ${modelsToTry.length} model đều thất bại.`);
+  throw lastError || new Error("Tất cả models đều thất bại. Vui lòng kiểm tra API key hoặc thử lại sau.");
 };
+
+/** Sinh nội dung đề tài (có Google Search grounding để tra nguồn thật). Trả về toàn văn kết quả. */
+export const sendMessageStream = (message: string, onChunk: (text: string) => void, model?: string, provider?: AiProvider): Promise<string> =>
+  streamWithFallback(message, onChunk, { useSearch: true, model, provider, label: 'Chat' });
+
+/**
+ * Gửi prompt đơn lẻ với streaming, không dùng công cụ tìm kiếm.
+ * Dùng cho phụ lục, gợi ý, chỉnh sửa văn bản, chấm chất lượng.
+ */
+export const sendSinglePromptStream = (message: string, onChunk: (text: string) => void, model?: string, provider?: AiProvider): Promise<string> =>
+  streamWithFallback(message, onChunk, { useSearch: false, model, provider, label: 'SinglePrompt' });
+
+export interface ApiKeyCheckResult {
+  ok: boolean;
+  workingModel?: string;
+  errorType?: string;
+  message: string;
+}
+
+/**
+ * Kiểm tra key bằng một request rất nhỏ, thử lần lượt model đã chọn rồi các model dự phòng.
+ * Trả về model đầu tiên gọi được để người dùng biết key thực sự dùng được với model nào.
+ */
+export const validateApiKey = async (apiKey: string, provider: AiProvider, preferredModel: string): Promise<ApiKeyCheckResult> => {
+  const ai = createGoogleAiClient(apiKey.trim(), provider);
+  let lastError: any = null;
+
+  for (const model of getOrderedModels(preferredModel, provider)) {
+    try {
+      await ai.models.generateContent({
+        model,
+        contents: 'Trả lời đúng một từ: OK',
+        config: { maxOutputTokens: 16 }
+      });
+      return {
+        ok: true,
+        workingModel: model,
+        message: model === preferredModel
+          ? `Key hoạt động tốt với model ${model}.`
+          : `Key hoạt động, nhưng model ${preferredModel} không gọi được; dùng được ${model}.`
+      };
+    } catch (error: any) {
+      lastError = error;
+      const errorType = parseApiError(error);
+      if (!FALLBACK_ERROR_TYPES.has(errorType)) {
+        const info = getFriendlyErrorMessage(error);
+        return { ok: false, errorType, message: `${info.title}: ${info.message}` };
+      }
+    }
+  }
+
+  const info = getFriendlyErrorMessage(lastError);
+  return { ok: false, errorType: parseApiError(lastError), message: `${info.title}: ${info.message}` };
+};
+
 export const analyzeDocumentForSKKN = async (
   apiKey: string,
   documentContent: string,

@@ -1,10 +1,11 @@
 import { AiProvider } from '../constants';
 
 /**
- * API Key Manager - Quản lý nhiều API key với cơ chế xoay vòng
+ * API Key Manager - Quản lý nhiều API key với cơ chế xoay vòng.
+ * Mỗi provider (Gemini / Agent Platform) có danh sách key riêng, không bao giờ trộn lẫn.
  */
 
-export const GOOGLE_AI_API_KEY_PATTERN = /^(?:AIzaSy|AQ)\S{8,}$/;
+export const GOOGLE_AI_API_KEY_PATTERN = /^(?:AIza|AQ)[\w.\-]{20,}$/;
 
 // Trạng thái của một API key
 export type ApiKeyStatus = 'active' | 'error' | 'cooldown';
@@ -18,6 +19,7 @@ export interface ApiKeyInfo {
     errorCount: number;
     cooldownUntil?: number; // Timestamp khi hết cooldown
     addedAt: number;
+    source?: 'user' | 'env'; // key từ .env chỉ giữ trong bộ nhớ, không ghi xuống localStorage
 }
 
 // Kết quả khi xoay key
@@ -32,34 +34,34 @@ export interface ApiKeyRotationResult {
 export type KeyRotationCallback = (info: { fromKey: string; toKey: string; reason: string }) => void;
 export type AllKeysFailedCallback = () => void;
 
-const GEMINI_STORAGE_KEY = 'gemini_api_keys';
-const AGENT_PLATFORM_STORAGE_KEY = 'agent_platform_api_keys';
-const MAX_KEYS = 16;
-const COOLDOWN_DURATION = 5 * 60 * 1000;
-const MAX_ERROR_COUNT = 1;
+interface ProviderKeyList {
+    keys: ApiKeyInfo[];
+    currentIndex: number;
+}
 
-// Đọc danh sách API key từ biến môi trường (.env)
-const getEnvKeys = (): { key: string; name: string }[] => {
-    const envKeys = import.meta.env.VITE_GEMINI_API_KEYS || '';
-    if (!envKeys) return [];
-    return envKeys
-        .split(',')
-        .map((k: string) => k.trim())
-        .filter((k: string) => k.length > 0)
-        .map((k: string, i: number) => ({ key: k, name: `Key ${i + 1}` }));
+const STORAGE_KEYS: Record<AiProvider, { list: string; single: string }> = {
+    'gemini': { list: 'gemini_api_keys', single: 'gemini_api_key' },
+    'agent-platform': { list: 'agent_platform_api_keys', single: 'agent_platform_api_key' },
+};
+const MAX_KEYS = 16;
+const QUOTA_COOLDOWN = 10 * 60 * 1000;
+const RATE_LIMIT_COOLDOWN = 60 * 1000;
+const TRANSIENT_COOLDOWN = 2 * 60 * 1000;
+// Lỗi tạm thời (mạng, 5xx) chỉ đưa key vào cooldown khi lặp lại nhiều lần liên tiếp
+const MAX_TRANSIENT_ERRORS = 3;
+
+// Đọc danh sách API key từ biến môi trường (.env). Lưu ý: biến VITE_* bị đóng gói vào JS phía client.
+const getEnvKeys = (provider: AiProvider): string[] => {
+    const raw = provider === 'agent-platform'
+        ? (import.meta.env.VITE_AGENT_PLATFORM_API_KEYS || '')
+        : (import.meta.env.VITE_GEMINI_API_KEYS || '');
+    return raw.split(',').map((k: string) => k.trim()).filter((k: string) => GOOGLE_AI_API_KEY_PATTERN.test(k));
 };
 
-const BACKUP_API_KEYS = getEnvKeys();
-
 class ApiKeyManager {
-    private keys: ApiKeyInfo[] = [];
-    private currentIndex: number = 0;
+    private lists: Partial<Record<AiProvider, ProviderKeyList>> = {};
     private onKeyRotation?: KeyRotationCallback;
     private onAllKeysFailed?: AllKeysFailedCallback;
-
-    constructor() {
-        this.loadFromStorage();
-    }
 
     getProvider(): AiProvider {
         const stored = localStorage.getItem('google_ai_provider') as AiProvider;
@@ -82,214 +84,201 @@ class ApiKeyManager {
         this.onAllKeysFailed = callback;
     }
 
-    loadFromStorage(provider?: AiProvider): void {
+    private getList(provider?: AiProvider): ProviderKeyList {
         const activeProvider = provider || this.getProvider();
-        const storageKey = activeProvider === 'agent-platform' ? AGENT_PLATFORM_STORAGE_KEY : GEMINI_STORAGE_KEY;
-        const singleKeyStorageName = activeProvider === 'agent-platform' ? 'agent_platform_api_key' : 'gemini_api_key';
+        if (!this.lists[activeProvider]) {
+            this.lists[activeProvider] = this.loadFromStorage(activeProvider);
+        }
+        return this.lists[activeProvider]!;
+    }
+
+    private loadFromStorage(provider: AiProvider): ProviderKeyList {
+        const { list: listKey, single: singleKey } = STORAGE_KEYS[provider];
+        const result: ProviderKeyList = { keys: [], currentIndex: 0 };
 
         try {
-            const stored = localStorage.getItem(storageKey);
+            const stored = localStorage.getItem(listKey);
             if (stored) {
                 const data = JSON.parse(stored);
-                this.keys = data.keys || [];
-                this.currentIndex = data.currentIndex || 0;
-                this.checkAndResetCooldowns();
-            } else {
-                this.keys = [];
-                this.currentIndex = 0;
-            }
-
-            const oldKey = localStorage.getItem(singleKeyStorageName);
-            if (oldKey && this.keys.length === 0) {
-                this.addKey(oldKey, 'Key mặc định', activeProvider);
-            }
-
-            if (activeProvider === 'gemini') {
-                this.injectBackupKeys();
+                result.keys = (Array.isArray(data.keys) ? data.keys : [])
+                    .filter((k: ApiKeyInfo) => k && typeof k.key === 'string')
+                    .map((k: ApiKeyInfo) => ({ ...k, source: 'user' as const }));
+                result.currentIndex = Number(data.currentIndex) || 0;
             }
         } catch (e) {
-            console.error(`Lỗi load API keys cho ${activeProvider}:`, e);
-            this.keys = [];
-            this.currentIndex = 0;
-            if (activeProvider === 'gemini') {
-                this.injectBackupKeys();
+            console.error(`Lỗi load API keys cho ${provider}:`, e);
+        }
+
+        // Bản cũ từng ghi cả key .env xuống localStorage: loại chúng khỏi danh sách "của người dùng"
+        const envKeys = getEnvKeys(provider);
+        result.keys = result.keys.filter(k => !envKeys.includes(k.key));
+
+        // Key người dùng chọn gần nhất (ô đơn) luôn được ưu tiên dùng trước
+        const preferred = (localStorage.getItem(singleKey) || '').trim();
+        if (preferred && GOOGLE_AI_API_KEY_PATTERN.test(preferred) && !envKeys.includes(preferred)) {
+            let idx = result.keys.findIndex(k => k.key === preferred);
+            if (idx === -1 && result.keys.length < MAX_KEYS) {
+                result.keys.push(this.newKeyInfo(preferred, 'Key của tôi', 'user'));
+                idx = result.keys.length - 1;
+            }
+            if (idx !== -1) result.currentIndex = idx;
+        }
+
+        for (const envKey of envKeys) {
+            if (result.keys.length >= MAX_KEYS) break;
+            if (!result.keys.some(k => k.key === envKey)) {
+                result.keys.push(this.newKeyInfo(envKey, `Key hệ thống ${result.keys.length + 1}`, 'env'));
             }
         }
+
+        if (result.currentIndex >= result.keys.length) result.currentIndex = 0;
+        return result;
     }
 
-    private injectBackupKeys(): void {
-        let added = 0;
-        for (const backup of BACKUP_API_KEYS) {
-            if (!this.keys.some(k => k.key === backup.key)) {
-                if (this.keys.length < MAX_KEYS) {
-                    this.keys.push({
-                        key: backup.key,
-                        name: backup.name,
-                        status: 'active',
-                        errorCount: 0,
-                        addedAt: Date.now(),
-                    });
-                    added++;
-                }
-            }
-        }
-        if (added > 0) {
-            this.saveToStorage('gemini');
-        }
+    private newKeyInfo(key: string, name: string, source: 'user' | 'env'): ApiKeyInfo {
+        return { key, name, status: 'active', errorCount: 0, addedAt: Date.now(), source };
     }
 
-    saveToStorage(provider?: AiProvider): void {
+    private saveToStorage(provider?: AiProvider): void {
         const activeProvider = provider || this.getProvider();
-        const storageKey = activeProvider === 'agent-platform' ? AGENT_PLATFORM_STORAGE_KEY : GEMINI_STORAGE_KEY;
-        const singleKeyStorageName = activeProvider === 'agent-platform' ? 'agent_platform_api_key' : 'gemini_api_key';
+        const list = this.getList(activeProvider);
+        const { list: listKey, single: singleKey } = STORAGE_KEYS[activeProvider];
 
         try {
-            const data = {
-                keys: this.keys,
-                currentIndex: this.currentIndex
-            };
-            localStorage.setItem(storageKey, JSON.stringify(data));
+            const userKeys = list.keys.filter(k => k.source !== 'env');
+            const current = list.keys[list.currentIndex];
+            localStorage.setItem(listKey, JSON.stringify({
+                keys: userKeys,
+                currentIndex: Math.max(0, userKeys.indexOf(current as ApiKeyInfo)),
+            }));
 
-            const activeKey = this.getActiveKey(activeProvider);
-            if (activeKey) {
-                localStorage.setItem(singleKeyStorageName, activeKey);
+            // Ô đơn chỉ chứa key người dùng tự nhập, không chứa key hệ thống
+            if (current && current.source !== 'env') {
+                localStorage.setItem(singleKey, current.key);
             }
         } catch (e) {
             console.error(`Lỗi lưu API keys cho ${activeProvider}:`, e);
         }
     }
 
-    private checkAndResetCooldowns(): void {
+    private checkAndResetCooldowns(provider?: AiProvider): void {
         const now = Date.now();
-        let hasChanges = false;
-
-        this.keys.forEach(keyInfo => {
-            if (keyInfo.status === 'cooldown' && keyInfo.cooldownUntil && keyInfo.cooldownUntil <= now) {
+        this.getList(provider).keys.forEach(keyInfo => {
+            if (keyInfo.status === 'cooldown' && (!keyInfo.cooldownUntil || keyInfo.cooldownUntil <= now)) {
                 keyInfo.status = 'active';
                 keyInfo.errorCount = 0;
                 keyInfo.cooldownUntil = undefined;
-                hasChanges = true;
             }
         });
-
-        if (hasChanges) {
-            this.saveToStorage();
-        }
     }
 
     addKey(key: string, name?: string, provider?: AiProvider): { success: boolean; message: string } {
-        const activeProvider = provider || this.getProvider();
-        if (this.keys.length >= MAX_KEYS) {
+        const list = this.getList(provider);
+        const trimmedKey = key.trim();
+
+        if (!GOOGLE_AI_API_KEY_PATTERN.test(trimmedKey)) {
+            return { success: false, message: 'Key không đúng định dạng (bắt đầu bằng AIza hoặc AQ)' };
+        }
+        if (list.keys.some(k => k.key === trimmedKey)) {
+            return { success: false, message: 'Key này đã tồn tại' };
+        }
+        if (list.keys.length >= MAX_KEYS) {
             return { success: false, message: `Đã đạt giới hạn ${MAX_KEYS} key` };
         }
 
-        const trimmedKey = key.trim();
-        if (this.keys.some(k => k.key === trimmedKey)) {
-            return { success: false, message: 'Key này đã tồn tại' };
-        }
-
-        if (!GOOGLE_AI_API_KEY_PATTERN.test(trimmedKey)) {
-            return { success: false, message: 'Key không đúng định dạng (bắt đầu bằng AIzaSy hoặc AQ)' };
-        }
-
-        const newKey: ApiKeyInfo = {
-            key: trimmedKey,
-            name: name?.trim() || `Key ${this.keys.length + 1}`,
-            status: 'active',
-            errorCount: 0,
-            addedAt: Date.now()
-        };
-
-        this.keys.push(newKey);
-        this.saveToStorage(activeProvider);
-
+        list.keys.push(this.newKeyInfo(trimmedKey, name?.trim() || `Key ${list.keys.length + 1}`, 'user'));
+        this.saveToStorage(provider);
         return { success: true, message: 'Đã thêm key thành công' };
     }
 
-    removeKey(key: string): { success: boolean; message: string } {
-        const index = this.keys.findIndex(k => k.key === key);
+    /** Thêm (nếu chưa có) và chọn key làm key đang dùng; key được chọn thủ công luôn được kích hoạt lại. */
+    useKey(key: string, provider?: AiProvider): { success: boolean; message: string } {
+        const trimmedKey = key.trim();
+        const list = this.getList(provider);
+        if (!list.keys.some(k => k.key === trimmedKey)) {
+            const added = this.addKey(trimmedKey, 'Key của tôi', provider);
+            if (!added.success) return added;
+        }
+        return this.setActiveKey(trimmedKey, provider);
+    }
+
+    removeKey(key: string, provider?: AiProvider): { success: boolean; message: string } {
+        const list = this.getList(provider);
+        const index = list.keys.findIndex(k => k.key === key);
         if (index === -1) {
             return { success: false, message: 'Không tìm thấy key' };
         }
 
-        if (index === this.currentIndex) {
-            if (this.keys.length > 1) {
-                this.currentIndex = (this.currentIndex + 1) % (this.keys.length - 1);
-            } else {
-                this.currentIndex = 0;
-            }
-        } else if (index < this.currentIndex) {
-            this.currentIndex--;
+        list.keys.splice(index, 1);
+        if (index < list.currentIndex || list.currentIndex >= list.keys.length) {
+            list.currentIndex = Math.max(0, list.currentIndex - 1);
         }
-
-        this.keys.splice(index, 1);
-        this.saveToStorage();
-
+        this.saveToStorage(provider);
         return { success: true, message: 'Đã xóa key' };
     }
 
+    /** Key đang dùng; bỏ qua key đang lỗi/cooldown và tự chuyển sang key còn hoạt động. */
     getActiveKey(provider?: AiProvider): string | null {
-        const activeProvider = provider || this.getProvider();
-        const singleKeyStorageName = activeProvider === 'agent-platform' ? 'agent_platform_api_key' : 'gemini_api_key';
-        
-        // 1. Kiểm tra trực tiếp trong localStorage key đơn lẻ
-        const directKey = localStorage.getItem(singleKeyStorageName);
-        if (directKey && GOOGLE_AI_API_KEY_PATTERN.test(directKey.trim())) {
-            return directKey.trim();
-        }
-
-        // 2. Nếu không có key đơn lẻ, lấy từ mảng danh sách keys
-        this.loadFromStorage(activeProvider);
-        if (this.keys.length === 0) {
+        const list = this.getList(provider);
+        this.checkAndResetCooldowns(provider);
+        if (list.keys.length === 0) {
             return null;
         }
 
-        for (let i = 0; i < this.keys.length; i++) {
-            const idx = (this.currentIndex + i) % this.keys.length;
-            const keyInfo = this.keys[idx];
-            if (keyInfo.status === 'active') {
-                this.currentIndex = idx;
-                return keyInfo.key;
+        for (let i = 0; i < list.keys.length; i++) {
+            const idx = (list.currentIndex + i) % list.keys.length;
+            if (list.keys[idx].status === 'active') {
+                list.currentIndex = idx;
+                return list.keys[idx].key;
             }
         }
-
         return null;
     }
 
-    markKeyError(key: string, errorType: string): ApiKeyRotationResult {
-        const keyInfo = this.keys.find(k => k.key === key);
+    markKeyError(key: string, errorType: string, provider?: AiProvider): ApiKeyRotationResult {
+        const list = this.getList(provider);
+        let keyInfo = list.keys.find(k => k.key === key);
         if (!keyInfo) {
-            return { success: false, hasMoreKeys: false, message: 'Không tìm thấy key' };
+            if (!GOOGLE_AI_API_KEY_PATTERN.test(key)) {
+                return { success: false, hasMoreKeys: false, message: 'Không tìm thấy key' };
+            }
+            keyInfo = this.newKeyInfo(key, 'Key của tôi', 'user');
+            list.keys.push(keyInfo);
         }
+        list.currentIndex = list.keys.indexOf(keyInfo);
 
         keyInfo.lastError = errorType;
         keyInfo.errorCount++;
 
-        if (errorType === 'QUOTA_EXCEEDED' || errorType === 'RATE_LIMIT') {
+        if (errorType === 'QUOTA_EXCEEDED') {
             keyInfo.status = 'cooldown';
-            keyInfo.cooldownUntil = Date.now() + COOLDOWN_DURATION;
-        } else if (errorType === 'INVALID_API_KEY') {
+            keyInfo.cooldownUntil = Date.now() + QUOTA_COOLDOWN;
+        } else if (errorType === 'RATE_LIMIT') {
+            keyInfo.status = 'cooldown';
+            keyInfo.cooldownUntil = Date.now() + RATE_LIMIT_COOLDOWN;
+        } else if (errorType === 'INVALID_API_KEY' || errorType === 'PERMISSION_DENIED') {
             keyInfo.status = 'error';
-        } else if (keyInfo.errorCount >= MAX_ERROR_COUNT) {
+        } else if (keyInfo.errorCount >= MAX_TRANSIENT_ERRORS) {
             keyInfo.status = 'cooldown';
-            keyInfo.cooldownUntil = Date.now() + COOLDOWN_DURATION;
+            keyInfo.cooldownUntil = Date.now() + TRANSIENT_COOLDOWN;
         }
 
-        this.saveToStorage();
-        return this.rotateToNextKey(errorType);
+        this.saveToStorage(provider);
+        return this.rotateToNextKey(errorType, provider);
     }
 
-    rotateToNextKey(reason: string = 'manual'): ApiKeyRotationResult {
-        this.checkAndResetCooldowns();
-        const fromKey = this.keys[this.currentIndex]?.key;
+    rotateToNextKey(reason: string = 'manual', provider?: AiProvider): ApiKeyRotationResult {
+        const list = this.getList(provider);
+        this.checkAndResetCooldowns(provider);
+        const fromKey = list.keys[list.currentIndex]?.key;
 
-        for (let i = 1; i <= this.keys.length; i++) {
-            const nextIndex = (this.currentIndex + i) % this.keys.length;
-            const nextKey = this.keys[nextIndex];
+        for (let i = 1; i <= list.keys.length; i++) {
+            const nextIndex = (list.currentIndex + i) % list.keys.length;
+            const nextKey = list.keys[nextIndex];
 
-            if (nextKey.status === 'active') {
-                this.currentIndex = nextIndex;
-                this.saveToStorage();
+            if (nextKey.status === 'active' && nextKey.key !== fromKey) {
+                list.currentIndex = nextIndex;
+                this.saveToStorage(provider);
 
                 if (this.onKeyRotation && fromKey) {
                     this.onKeyRotation({
@@ -319,23 +308,24 @@ class ApiKeyManager {
         };
     }
 
-    getAllKeys(): ApiKeyInfo[] {
-        this.checkAndResetCooldowns();
-        return [...this.keys];
+    getAllKeys(provider?: AiProvider): ApiKeyInfo[] {
+        this.checkAndResetCooldowns(provider);
+        return [...this.getList(provider).keys];
     }
 
-    getKeyStats(): { total: number; active: number; error: number; cooldown: number } {
-        this.checkAndResetCooldowns();
+    getKeyStats(provider?: AiProvider): { total: number; active: number; error: number; cooldown: number } {
+        this.checkAndResetCooldowns(provider);
+        const keys = this.getList(provider).keys;
         return {
-            total: this.keys.length,
-            active: this.keys.filter(k => k.status === 'active').length,
-            error: this.keys.filter(k => k.status === 'error').length,
-            cooldown: this.keys.filter(k => k.status === 'cooldown').length
+            total: keys.length,
+            active: keys.filter(k => k.status === 'active').length,
+            error: keys.filter(k => k.status === 'error').length,
+            cooldown: keys.filter(k => k.status === 'cooldown').length
         };
     }
 
-    resetKey(key: string): { success: boolean; message: string } {
-        const keyInfo = this.keys.find(k => k.key === key);
+    resetKey(key: string, provider?: AiProvider): { success: boolean; message: string } {
+        const keyInfo = this.getList(provider).keys.find(k => k.key === key);
         if (!keyInfo) {
             return { success: false, message: 'Không tìm thấy key' };
         }
@@ -345,18 +335,18 @@ class ApiKeyManager {
         keyInfo.cooldownUntil = undefined;
         keyInfo.lastError = undefined;
 
-        this.saveToStorage();
+        this.saveToStorage(provider);
         return { success: true, message: 'Đã kích hoạt lại key' };
     }
 
-    updateKeyName(key: string, newName: string): { success: boolean; message: string } {
-        const keyInfo = this.keys.find(k => k.key === key);
+    updateKeyName(key: string, newName: string, provider?: AiProvider): { success: boolean; message: string } {
+        const keyInfo = this.getList(provider).keys.find(k => k.key === key);
         if (!keyInfo) {
             return { success: false, message: 'Không tìm thấy key' };
         }
 
         keyInfo.name = newName.trim() || keyInfo.name;
-        this.saveToStorage();
+        this.saveToStorage(provider);
         return { success: true, message: 'Đã cập nhật tên key' };
     }
 
@@ -365,44 +355,39 @@ class ApiKeyManager {
         return key.substring(0, 4) + '...' + key.substring(key.length - 4);
     }
 
-    hasAvailableKeys(): boolean {
-        this.checkAndResetCooldowns();
-        return this.keys.some(k => k.status === 'active');
+    hasAvailableKeys(provider?: AiProvider): boolean {
+        this.checkAndResetCooldowns(provider);
+        return this.getList(provider).keys.some(k => k.status === 'active');
     }
 
-    getCurrentIndex(): number {
-        return this.currentIndex;
+    getCurrentIndex(provider?: AiProvider): number {
+        return this.getList(provider).currentIndex;
     }
 
-    setActiveKey(keyOrIndex: string | number): { success: boolean; message: string } {
-        let index: number;
+    setActiveKey(keyOrIndex: string | number, provider?: AiProvider): { success: boolean; message: string } {
+        const list = this.getList(provider);
+        const index = typeof keyOrIndex === 'number'
+            ? keyOrIndex
+            : list.keys.findIndex(k => k.key === keyOrIndex.trim());
 
-        if (typeof keyOrIndex === 'number') {
-            index = keyOrIndex;
-        } else {
-            index = this.keys.findIndex(k => k.key === keyOrIndex);
-        }
-
-        if (index < 0 || index >= this.keys.length) {
+        if (index < 0 || index >= list.keys.length) {
             return { success: false, message: 'Key không tồn tại' };
         }
 
-        const keyInfo = this.keys[index];
-        if (keyInfo.status !== 'active') {
-            keyInfo.status = 'active';
-            keyInfo.errorCount = 0;
-            keyInfo.cooldownUntil = undefined;
-            keyInfo.lastError = undefined;
-        }
+        const keyInfo = list.keys[index];
+        keyInfo.status = 'active';
+        keyInfo.errorCount = 0;
+        keyInfo.cooldownUntil = undefined;
+        keyInfo.lastError = undefined;
 
-        this.currentIndex = index;
-        this.saveToStorage();
+        list.currentIndex = index;
+        this.saveToStorage(provider);
         return { success: true, message: `Đã chuyển sang key: ${keyInfo.name}` };
     }
 
-    resetAllKeys(): { success: boolean; message: string } {
+    resetAllKeys(provider?: AiProvider): { success: boolean; message: string } {
         let resetCount = 0;
-        this.keys.forEach(keyInfo => {
+        this.getList(provider).keys.forEach(keyInfo => {
             if (keyInfo.status !== 'active') {
                 keyInfo.status = 'active';
                 keyInfo.errorCount = 0;
@@ -412,21 +397,26 @@ class ApiKeyManager {
             }
         });
 
-        this.saveToStorage();
+        this.saveToStorage(provider);
         return { success: true, message: `Đã reset ${resetCount} key` };
     }
 
-    getNextAvailableKey(): string | null {
-        this.checkAndResetCooldowns();
+    getNextAvailableKey(provider?: AiProvider): string | null {
+        const list = this.getList(provider);
+        this.checkAndResetCooldowns(provider);
 
-        for (let i = 1; i <= this.keys.length; i++) {
-            const nextIndex = (this.currentIndex + i) % this.keys.length;
-            const nextKey = this.keys[nextIndex];
+        for (let i = 1; i <= list.keys.length; i++) {
+            const nextKey = list.keys[(list.currentIndex + i) % list.keys.length];
             if (nextKey.status === 'active') {
                 return nextKey.key;
             }
         }
         return null;
+    }
+
+    /** Số key hệ thống (.env) đang có cho provider — dùng để hiển thị, không lộ giá trị key */
+    getEnvKeyCount(provider?: AiProvider): number {
+        return this.getList(provider).keys.filter(k => k.source === 'env').length;
     }
 }
 

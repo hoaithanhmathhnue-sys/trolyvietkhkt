@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Button } from './Button';
-import { Key, X, Zap, Cpu, Sparkles, ExternalLink, Bot, Globe, ShieldCheck, Server } from 'lucide-react';
+import { Key, X, Zap, Cpu, Sparkles, ExternalLink, Bot, Globe, ShieldCheck, Server, Loader2, CheckCircle2 } from 'lucide-react';
 import {
     AiProvider,
     DEFAULT_GEMINI_MODEL,
@@ -10,24 +10,16 @@ import {
     MODEL_INFO
 } from '../constants';
 import { apiKeyManager, GOOGLE_AI_API_KEY_PATTERN } from '../services/apiKeyManager';
+import { validateApiKey } from '../services/geminiService';
 
 interface ApiKeyModalProps {
     isOpen: boolean;
-    onSave: (key: string, selectedModel: string, provider: AiProvider) => void;
+    /** key = null nghĩa là dùng kho key hệ thống (.env) */
+    onSave: (key: string | null, selectedModel: string, provider: AiProvider) => void;
     onClose: () => void;
     isDismissible?: boolean;
     currentProvider?: AiProvider;
 }
-
-// Đọc API keys từ biến môi trường theo provider
-const getEnvApiKeys = (provider: AiProvider): string[] => {
-    const envVar = provider === 'agent-platform'
-        ? (import.meta.env.VITE_AGENT_PLATFORM_API_KEYS || import.meta.env.VITE_GEMINI_API_KEYS || '')
-        : (import.meta.env.VITE_GEMINI_API_KEYS || '');
-
-    if (!envVar) return [];
-    return envVar.split(',').map((k: string) => k.trim()).filter((k: string) => k.length > 0);
-};
 
 const ModelIcon: React.FC<{ modelId: string }> = ({ modelId }) => {
     if (modelId.includes('3-flash') || modelId.includes('2.5-flash')) return <Zap className="w-5 h-5" />;
@@ -46,24 +38,24 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({
     const [selectedModel, setSelectedModel] = useState<string>(DEFAULT_GEMINI_MODEL);
     const [apiKey, setApiKey] = useState('');
     const [error, setError] = useState('');
+    const [checkState, setCheckState] = useState<{ status: 'idle' | 'checking' | 'ok' | 'fail'; message: string }>({ status: 'idle', message: '' });
 
-    // Lấy danh sách key từ env cho provider hiện tại
-    const envKeys = useMemo(() => getEnvApiKeys(provider), [provider]);
-    const hasEnvKeys = envKeys.length > 0;
+    // Chỉ cần biết số lượng key hệ thống; giá trị key không đưa lên giao diện
+    const envKeyCount = useMemo(() => apiKeyManager.getEnvKeyCount(provider), [provider]);
+    const hasEnvKeys = envKeyCount > 0;
 
     // Tải cấu hình khi Modal mở hoặc khi provider thay đổi
     useEffect(() => {
         if (isOpen) {
             const activeProvider = provider || apiKeyManager.getProvider();
-            const savedKey = activeProvider === 'agent-platform'
-                ? (localStorage.getItem('agent_platform_api_key') || localStorage.getItem('gemini_api_key') || '')
-                : (localStorage.getItem('gemini_api_key') || '');
+            const savedKey = localStorage.getItem(activeProvider === 'agent-platform' ? 'agent_platform_api_key' : 'gemini_api_key') || '';
 
             const savedModel = localStorage.getItem('selected_model');
             const validModels = activeProvider === 'agent-platform' ? AGENT_PLATFORM_MODELS : GEMINI_MODELS;
             const defaultModel = activeProvider === 'agent-platform' ? DEFAULT_AGENT_PLATFORM_MODEL : DEFAULT_GEMINI_MODEL;
 
             setApiKey(savedKey);
+            setCheckState({ status: 'idle', message: '' });
             if (savedModel && (validModels as readonly string[]).includes(savedModel)) {
                 setSelectedModel(savedModel);
             } else {
@@ -77,50 +69,60 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({
         setProvider(newProvider);
         setError('');
 
-        const savedKey = newProvider === 'agent-platform'
-            ? (localStorage.getItem('agent_platform_api_key') || localStorage.getItem('gemini_api_key') || '')
-            : (localStorage.getItem('gemini_api_key') || '');
+        // Không mang key của provider này sang provider kia: key AI Studio không dùng được cho Agent Platform
+        const savedKey = localStorage.getItem(newProvider === 'agent-platform' ? 'agent_platform_api_key' : 'gemini_api_key') || '';
 
-        const validModels = newProvider === 'agent-platform' ? AGENT_PLATFORM_MODELS : GEMINI_MODELS;
         const defaultModel = newProvider === 'agent-platform' ? DEFAULT_AGENT_PLATFORM_MODEL : DEFAULT_GEMINI_MODEL;
 
         setApiKey(savedKey);
         setSelectedModel(defaultModel);
+        setCheckState({ status: 'idle', message: '' });
+    };
+
+    const handleCheckKey = async () => {
+        const keyToCheck = apiKey.trim() || (hasEnvKeys ? apiKeyManager.getActiveKey(provider) || '' : '');
+        if (!keyToCheck) {
+            setError('Vui lòng nhập API Key trước khi kiểm tra.');
+            return;
+        }
+        if (!GOOGLE_AI_API_KEY_PATTERN.test(keyToCheck)) {
+            setError('API Key không đúng định dạng. Key phải bắt đầu bằng "AIza" hoặc "AQ".');
+            return;
+        }
+        setError('');
+        setCheckState({ status: 'checking', message: 'Đang gửi một yêu cầu nhỏ để kiểm tra...' });
+        const result = await validateApiKey(keyToCheck, provider, selectedModel);
+        if (result.ok && result.workingModel && result.workingModel !== selectedModel) {
+            setSelectedModel(result.workingModel);
+        }
+        setCheckState({ status: result.ok ? 'ok' : 'fail', message: result.message });
     };
 
     const handleSave = () => {
         const trimmedKey = apiKey.trim();
 
-        // Nếu không nhập key → dùng key đầu tiên từ env
-        let keyToSave = trimmedKey;
-        if (!keyToSave && hasEnvKeys) {
-            keyToSave = envKeys[0];
-        }
-
-        if (!keyToSave) {
+        if (!trimmedKey && !hasEnvKeys) {
             setError(`Vui lòng nhập API Key cho ${provider === 'agent-platform' ? 'Agent Platform API' : 'Google Gemini'}`);
             return;
         }
 
-        if (!GOOGLE_AI_API_KEY_PATTERN.test(keyToSave)) {
-            setError('API Key không hợp lệ. Key phải bắt đầu bằng "AIzaSy" hoặc "AQ" và đúng định dạng.');
-            return;
+        if (trimmedKey) {
+            if (!GOOGLE_AI_API_KEY_PATTERN.test(trimmedKey)) {
+                setError('API Key không hợp lệ. Key phải bắt đầu bằng "AIza" hoặc "AQ" và không chứa dấu cách.');
+                return;
+            }
+            const result = apiKeyManager.useKey(trimmedKey, provider);
+            if (!result.success) {
+                setError(result.message);
+                return;
+            }
         }
 
-        // Lưu Provider vào localStorage
         apiKeyManager.setProvider(provider);
-
-        // Lưu key vào storage tương ứng
-        if (provider === 'agent-platform') {
-            localStorage.setItem('agent_platform_api_key', keyToSave);
-        } else {
-            localStorage.setItem('gemini_api_key', keyToSave);
-        }
-
         localStorage.setItem('selected_model', selectedModel);
 
         setError('');
-        onSave(keyToSave, selectedModel, provider);
+        onSave(trimmedKey || null, selectedModel, provider);
     };
 
     if (!isOpen) return null;
@@ -308,8 +310,9 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({
                             onChange={(e) => {
                                 setApiKey(e.target.value);
                                 setError('');
+                                setCheckState({ status: 'idle', message: '' });
                             }}
-                            placeholder={hasEnvKeys ? "Để trống để dùng key mặc định, hoặc nhập key riêng (AIza.../AQ...)" : "Nhập API Key (AIza... hoặc AQ...)"}
+                            placeholder={hasEnvKeys ? "Để trống để dùng key hệ thống, hoặc nhập key riêng (AIza.../AQ...)" : (provider === 'agent-platform' ? "Nhập API Key Agent Platform (AQ...)" : "Nhập API Key Google AI Studio (AIza...)")}
                             className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-sky-500 focus:border-transparent outline-none text-sm font-mono shadow-sm transition-all"
                         />
 
@@ -321,43 +324,29 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({
                             </div>
                         )}
 
-                        {/* Thông báo key mặc định */}
+                        {/* Kiểm tra key */}
+                        <div className="mt-3 flex items-center gap-3">
+                            <button
+                                type="button"
+                                onClick={handleCheckKey}
+                                disabled={checkState.status === 'checking'}
+                                className="inline-flex items-center gap-2 px-3 py-2 text-xs font-semibold rounded-lg border border-sky-300 text-sky-700 bg-white hover:bg-sky-50 disabled:opacity-60 flex-shrink-0"
+                            >
+                                {checkState.status === 'checking' ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
+                                Kiểm tra key
+                            </button>
+                            {checkState.status !== 'idle' && (
+                                <span className={`text-xs ${checkState.status === 'ok' ? 'text-green-700' : checkState.status === 'fail' ? 'text-red-700' : 'text-gray-500'}`}>
+                                    {checkState.message}
+                                </span>
+                            )}
+                        </div>
+
+                        {/* Thông báo key hệ thống */}
                         {hasEnvKeys && (
                             <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-xl text-xs text-green-700 flex items-center gap-2">
                                 <ShieldCheck className="w-4 h-4 text-green-600 flex-shrink-0" />
-                                <span>Hệ thống đã tích hợp sẵn <strong>{envKeys.length} API Key</strong> dự phòng cho {provider === 'agent-platform' ? 'Agent Platform' : 'Gemini'}. Bạn có thể để trống hoặc dán key cá nhân.</span>
-                            </div>
-                        )}
-
-                        {/* Preset API Keys - chỉ hiện nếu có keys từ env */}
-                        {hasEnvKeys && (
-                            <div className="mt-4 p-4 bg-gray-50 border border-gray-200 rounded-xl">
-                                <p className="text-xs font-semibold text-gray-700 mb-2">
-                                    🔑 Chọn nhanh API Key dự phòng có sẵn:
-                                </p>
-                                <div className="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto">
-                                    {envKeys.map((key, idx) => {
-                                        const masked = key.startsWith('AIza') ? `AIza••••${key.slice(-4)}` : `AQ••••${key.slice(-4)}`;
-                                        const isActive = apiKey === key;
-                                        return (
-                                            <button
-                                                key={idx}
-                                                type="button"
-                                                onClick={() => {
-                                                    setApiKey(key);
-                                                    setError('');
-                                                }}
-                                                className={`px-3 py-2 text-xs font-mono rounded-lg border transition-all text-left truncate ${isActive
-                                                    ? 'border-sky-500 bg-sky-50 text-sky-800 ring-2 ring-sky-300 font-semibold'
-                                                    : 'border-gray-200 bg-white text-gray-700 hover:border-sky-300 hover:bg-sky-50'
-                                                    }`}
-                                                title={`Key #${idx + 1}`}
-                                            >
-                                                🔑 {masked}
-                                            </button>
-                                        );
-                                    })}
-                                </div>
+                                <span>Hệ thống có sẵn <strong>{envKeyCount} API Key</strong> dự phòng cho {provider === 'agent-platform' ? 'Agent Platform' : 'Gemini'}. Để trống ô trên để dùng, hoặc dán key cá nhân (được ưu tiên dùng trước).</span>
                             </div>
                         )}
 

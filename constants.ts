@@ -5,51 +5,56 @@
 export type AiProvider = 'gemini' | 'agent-platform';
 
 export const DEFAULT_GEMINI_MODEL = 'gemini-3.6-flash';
-export const DEFAULT_AGENT_PLATFORM_MODEL = 'gemini-2.5-flash';
+// Dòng 2.5 đã bị Google giới hạn (chỉ tài khoản từng dùng mới gọi được) => không dùng làm mặc định nữa
+export const DEFAULT_AGENT_PLATFORM_MODEL = 'gemini-3.6-flash';
 
-export const MODEL_NAME = 'gemini-3.6-flash';
+export const MODEL_NAME = DEFAULT_GEMINI_MODEL;
 
+// gemini-3.5-flash đã deprecated (08/10/2026, tự chuyển sang 3.6-flash); gemini-3.7-flash chuyển sang 3.8-flash
 export const GEMINI_MODELS = [
    'gemini-3.6-flash',
-   'gemini-3.5-flash',
+   'gemini-3.8-flash',
    'gemini-3.5-flash-lite',
    'gemini-3.1-flash-lite',
-   'gemini-2.5-flash',
+   'gemini-flash-latest',
    'gemini-3.1-pro-preview',
+   'gemini-2.5-flash',
    'gemini-2.5-pro'
 ] as const;
 
 export const AGENT_PLATFORM_MODELS = [
+   'gemini-3.6-flash',
+   'gemini-3.8-flash',
+   'gemini-3.5-flash-lite',
+   'gemini-3.1-flash-lite',
    'gemini-2.5-flash',
    'gemini-2.5-flash-lite',
    'gemini-2.5-pro',
    'gemini-3.1-pro-preview'
 ] as const;
 
+// Thứ tự thử khi model đang chọn lỗi (quá tải / không tồn tại / không có quyền với model đó)
 export const GEMINI_FALLBACK_MODELS = [
    'gemini-3.6-flash',
-   'gemini-3.5-flash',
+   'gemini-3.8-flash',
    'gemini-3.5-flash-lite',
    'gemini-3.1-flash-lite',
+   'gemini-flash-latest',
    'gemini-2.5-flash'
 ] as const;
 
 export const AGENT_PLATFORM_FALLBACK_MODELS = [
+   'gemini-3.6-flash',
+   'gemini-3.8-flash',
+   'gemini-3.5-flash-lite',
+   'gemini-3.1-flash-lite',
    'gemini-2.5-flash',
    'gemini-2.5-flash-lite'
 ] as const;
 
 export const FALLBACK_MODELS = [...GEMINI_FALLBACK_MODELS];
 
-export const MODEL_DISPLAY_ORDER = [
-   'gemini-3.6-flash',
-   'gemini-3.1-pro-preview',
-   'gemini-3.5-flash',
-   'gemini-3.5-flash-lite',
-   'gemini-3.1-flash-lite',
-   'gemini-2.5-flash',
-   'gemini-2.5-pro'
-];
+export const MODEL_DISPLAY_ORDER = [...GEMINI_MODELS];
 
 export interface ModelInfo {
    name: string;
@@ -75,9 +80,15 @@ export const MODEL_INFO: Record<string, ModelInfo> = {
       status: 'preview',
       priceNote: 'Chỉ dùng được khi dự án Google AI đã bật thanh toán; giá Standard từ 2 USD input và 12 USD output cho mỗi 1 triệu token.'
    },
-   'gemini-3.5-flash': {
-      name: 'Gemini 3.5 Flash',
-      description: 'Cân bằng giữa hiệu năng và tốc độ',
+   'gemini-3.8-flash': {
+      name: 'Gemini 3.8 Flash',
+      description: 'Model Flash mới nhất, cân bằng chất lượng và tốc độ',
+      access: 'free-and-paid',
+      status: 'stable'
+   },
+   'gemini-flash-latest': {
+      name: 'Gemini Flash (latest)',
+      description: 'Bí danh luôn trỏ tới bản Flash ổn định mới nhất của Google',
       access: 'free-and-paid',
       status: 'stable'
    },
@@ -95,22 +106,22 @@ export const MODEL_INFO: Record<string, ModelInfo> = {
    },
    'gemini-2.5-flash': {
       name: 'Gemini 2.5 Flash',
-      description: 'Chat nhanh, tương thích ngược; Google dự kiến ngừng ngày 16/10/2026',
+      description: 'Chỉ dùng được với tài khoản đã từng dùng model này (Google giới hạn từ 18/09/2026)',
       access: 'free-and-paid',
       status: 'retiring'
    },
    'gemini-2.5-flash-lite': {
       name: 'Gemini 2.5 Flash Lite',
-      description: 'Phiên bản nhẹ, tốc độ phản hồi cực nhanh trên Agent Platform',
+      description: 'Phiên bản nhẹ dòng 2.5; có thể bị giới hạn với tài khoản mới',
       access: 'free-and-paid',
-      status: 'stable'
+      status: 'retiring'
    },
    'gemini-2.5-pro': {
       name: 'Gemini 2.5 Pro',
       description: 'Suy luận phức tạp và xử lý tài liệu dài; chỉ giữ để tương thích tạm thời',
       access: 'free-and-paid',
       status: 'retiring',
-      priceNote: 'Có Paid Tier; Google dự kiến ngừng model này ngày 16/10/2026. Nên ưu tiên Gemini 3.1 Pro Preview cho tác vụ Pro mới.'
+      priceNote: 'Google đã giới hạn dòng 2.5 cho tài khoản từng sử dụng; key mới có thể bị từ chối. Nên ưu tiên Gemini 3.1 Pro Preview cho tác vụ Pro mới.'
    }
 };
 
@@ -182,9 +193,15 @@ Bạn là **Chuyên gia hướng dẫn nghiên cứu Khoa học Kỹ thuật (KH
 - Luôn ghi nguồn trích dẫn
 
 **2. BẮT BUỘC PHẢI:**
-- ✅ Mỗi đoạn có ít nhất 1 yếu tố riêng: số liệu cụ thể, quan sát thực tế
-- ✅ Tự tạo bảng số liệu logic (không copy từ nguồn khác)
-- ✅ Dùng số liệu lẻ tự nhiên: 42.3%, 67.8% thay vì 40%, 70%
+- ✅ Mỗi đoạn gắn với bối cảnh riêng của đề tài (đối tượng, địa phương, sản phẩm cụ thể)
+- ✅ Số liệu chỉ lấy từ thông tin học sinh cung cấp hoặc nguồn công bố có trích dẫn
+
+## 🛡️ LIÊM CHÍNH SỐ LIỆU (ƯU TIÊN CAO NHẤT, GHI ĐÈ MỌI CHỈ DẪN KHÁC)
+- KHÔNG BAO GIỜ tự tạo, ước đoán hay "giả lập" số liệu khảo sát, kết quả đo, kết quả thực nghiệm, p-value, tỉ lệ %.
+- Khi cần số liệu mà học sinh chưa cung cấp: chèn khung bảng trống có đủ tiêu đề cột, ô dữ liệu ghi "…", kèm dòng:
+  *[BẢNG SỐ LIỆU THẬT: <mô tả dữ liệu cần thu thập> — học sinh điền từ nhật ký thực nghiệm/phiếu khảo sát]*
+- Khi cần nhận xét kết quả: viết dạng hướng dẫn phân tích ("Nếu nhóm thực nghiệm có giá trị trung bình cao hơn có ý nghĩa thống kê thì…"), không khẳng định kết quả chưa có.
+- Số liệu từ tài liệu đã công bố phải ghi nguồn (Tác giả, năm); không tìm được nguồn thì không đưa vào.
 
 ## 📐 QUY TẮC ĐỊNH DẠNG (BẮT BUỘC)
 
@@ -202,8 +219,11 @@ Bạn là **Chuyên gia hướng dẫn nghiên cứu Khoa học Kỹ thuật (KH
 
 ❌ **SAI:** Bảng ASCII, HTML, thiếu phân cách
 
+## 🧾 ĐẦU RA
+- Chỉ trả về nội dung tài liệu (Markdown). KHÔNG vẽ menu, hộp thoại, trạng thái bước, câu hỏi xác nhận hay lời chào — giao diện ứng dụng đã lo phần đó.
+
 ## 🚀 QUY TRÌNH VIẾT ĐỀ TÀI
-1. Nhận thông tin → Lập dàn ý → HỎI XÁC NHẬN
+1. Nhận thông tin → Lập dàn ý → người dùng xác nhận trên giao diện
 2. Viết Phần I. Mở đầu (Tổng quan)
 3. Viết Phần II. Nội dung nghiên cứu (Chương 1: Cơ sở lý luận)
 4. Viết Chương 2: Thực trạng
@@ -212,6 +232,16 @@ Bạn là **Chuyên gia hướng dẫn nghiên cứu Khoa học Kỹ thuật (KH
 7. Viết Phụ lục: Phiếu khảo sát, Số liệu, Hình ảnh, Nhật ký, Mã nguồn/Link/QR, Minh chứng
 8. Viết Tài liệu tham khảo riêng, thống nhất theo APA hoặc IEEE
 `;
+
+// ═══════════════════════════════════════════════════════════
+// LUẬT LIÊM CHÍNH SỐ LIỆU - chèn vào MỌI prompt sinh nội dung
+// ═══════════════════════════════════════════════════════════
+export const DATA_PLACEHOLDER_TAG = 'BẢNG SỐ LIỆU THẬT';
+
+export const DATA_INTEGRITY_RULE = `🛡️ LIÊM CHÍNH SỐ LIỆU (BẮT BUỘC):
+- Mọi số liệu phải do học sinh cung cấp hoặc để trống; không được suy đoán, không "giả lập".
+- Thiếu số liệu: chèn bảng trống (đủ tiêu đề cột, ô dữ liệu ghi "…") kèm dòng *[${DATA_PLACEHOLDER_TAG}: <dữ liệu cần thu thập> — học sinh điền từ nhật ký thực nghiệm/phiếu khảo sát]*.
+- Nhận xét kết quả viết ở dạng hướng dẫn phân tích, không khẳng định kết quả chưa có.`;
 
 // ═══════════════════════════════════════════════════════════
 // PROMPT CHO TỪNG CHƯƠNG CỤ THỂ
@@ -227,11 +257,13 @@ NHIỆM VỤ: Viết nội dung đề tài KHKT chất lượng cao cho học si
 
 NGUYÊN TẮC BẮT BUỘC:
 1. Ngôn ngữ khoa học, khách quan, chính xác
-2. Có số liệu, bảng biểu minh chứng
+2. Bảng biểu chỉ chứa số liệu học sinh cung cấp hoặc có nguồn; thiếu thì để khung trống [BẢNG SỐ LIỆU THẬT: ...]
 3. Trích dẫn APA khi cần
 4. Phù hợp trình độ học sinh THPT
 5. Tính mới và tính sáng tạo cao
-6. Kết quả dựa trên dữ liệu thực tế/giả lập logic
+6. Không tự sinh số liệu, không khẳng định kết quả chưa có
+
+${DATA_INTEGRITY_RULE}
 
 FORMAT OUTPUT:
 - Xuống dòng sau mỗi câu

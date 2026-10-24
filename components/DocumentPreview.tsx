@@ -162,41 +162,56 @@ function formatContent(text: string): string {
   return result;
 }
 
+export interface EditableSection {
+  key: string;
+  label: string;
+  content: string;
+}
+
 interface Props {
   content: string;
-  onUpdate?: (newContent: string) => void;
+  title?: string;
+  /** Chỉnh sửa theo từng phần: lưu lại đúng phần được chọn thay vì ghi đè cả tài liệu */
+  sections?: EditableSection[];
+  defaultSectionKey?: string;
+  onUpdateSection?: (key: string, newContent: string) => void;
   isEditable?: boolean;
 }
 
-export const DocumentPreview: React.FC<Props> = ({ content, onUpdate, isEditable = false }) => {
+export const DocumentPreview: React.FC<Props> = ({ content, title = 'Bản thảo đề tài KHKT', sections = [], defaultSectionKey, onUpdateSection, isEditable = false }) => {
   const [isEditing, setIsEditing] = useState(false);
-  const [tempContent, setTempContent] = useState(content);
+  const [editKey, setEditKey] = useState<string | undefined>(defaultSectionKey);
+  const [tempContent, setTempContent] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
-  // Sync content when not editing (e.g. streaming updates)
-  useEffect(() => {
-    if (!isEditing) {
-      setTempContent(content);
-    }
-  }, [content, isEditing]);
+  const sectionContent = (key?: string) => sections.find(sec => sec.key === key)?.content ?? '';
 
   const handleSave = () => {
-    if (onUpdate) {
-      onUpdate(tempContent);
+    if (onUpdateSection && editKey !== undefined) {
+      onUpdateSection(editKey, tempContent);
     }
     setIsEditing(false);
   };
 
   const handleCancel = () => {
-    setTempContent(content);
     setIsEditing(false);
+  };
+
+  const switchSection = (key: string) => {
+    if (tempContent !== sectionContent(editKey) && !window.confirm('Bỏ các thay đổi chưa lưu của phần đang sửa?')) return;
+    setEditKey(key);
+    setTempContent(sectionContent(key));
   };
 
   const toggleEdit = () => {
     if (isEditing) {
       handleCancel();
     } else {
+      const key = sections.some(sec => sec.key === defaultSectionKey) ? defaultSectionKey : sections[sections.length - 1]?.key;
+      if (key === undefined) return;
+      setEditKey(key);
+      setTempContent(sectionContent(key));
       setIsEditing(true);
       // Focus textarea after render
       setTimeout(() => {
@@ -223,14 +238,24 @@ export const DocumentPreview: React.FC<Props> = ({ content, onUpdate, isEditable
           </div>
           <span className="text-gray-500 text-sm font-medium flex items-center gap-2">
             <FileText size={14} />
-            Bản thảo SKKN.docx
+            {title}
           </span>
         </div>
 
-        {isEditable && (
-          <div className="flex gap-2">
+        {isEditable && sections.length > 0 && (
+          <div className="flex gap-2 items-center">
             {isEditing ? (
               <>
+                {sections.length > 1 && (
+                  <select
+                    value={editKey}
+                    onChange={(e) => switchSection(e.target.value)}
+                    className="text-xs border border-gray-300 rounded px-2 py-1.5 bg-white text-gray-700"
+                    title="Chọn phần cần chỉnh sửa"
+                  >
+                    {sections.map(sec => <option key={sec.key} value={sec.key}>{sec.label}</option>)}
+                  </select>
+                )}
                 <button
                   onClick={handleCancel}
                   className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-gray-600 bg-white border border-gray-300 rounded hover:bg-gray-50 transition-colors"
@@ -291,7 +316,7 @@ export const DocumentPreview: React.FC<Props> = ({ content, onUpdate, isEditable
         {/* Overlay for save hint */}
         {isEditing && (
           <div className="absolute bottom-4 right-6 bg-black/75 text-white text-xs px-3 py-1.5 rounded-full pointer-events-none backdrop-blur-sm">
-            Nhấn "Lưu thay đổi" để cập nhật nội dung cho AI
+            Đang sửa: {sections.find(sec => sec.key === editKey)?.label} — nhấn "Lưu thay đổi" để cập nhật
           </div>
         )}
       </div>
